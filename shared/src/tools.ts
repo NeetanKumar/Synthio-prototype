@@ -1,0 +1,61 @@
+import { z } from 'zod';
+
+// Single source of truth for tool arguments: the same zod schema produces the
+// JSON schema sent to OpenAI (server) and validates the model's arguments (client).
+
+export const GotoSlideArgs = z.object({
+  slide_id: z.string().describe('ID of the slide to show. Must be one of the deck slide IDs.'),
+  reason: z.string().describe('Short reason, e.g. "user asked about adverse events".'),
+});
+
+export const HighlightArgs = z.object({
+  element_id: z.string().describe('ID of a bullet, chart bar group, table row or diagram step on the CURRENT slide.'),
+});
+
+export const FlagType = z.enum(['adverse_event', 'off_label', 'out_of_scope']);
+
+export const FlagArgs = z.object({
+  type: FlagType,
+  summary: z.string().describe('One sentence, factual, no speculation.'),
+});
+
+export const ResumeArgs = z.object({});
+
+export const TOOL_ARGS = {
+  goto_slide: GotoSlideArgs,
+  highlight: HighlightArgs,
+  flag_for_followup: FlagArgs,
+  resume_presentation: ResumeArgs,
+} as const;
+
+export type ToolName = keyof typeof TOOL_ARGS;
+export const TOOL_NAMES = Object.keys(TOOL_ARGS) as ToolName[];
+
+export function isToolName(name: string): name is ToolName {
+  return Object.hasOwn(TOOL_ARGS, name);
+}
+
+const DESCRIPTIONS: Record<ToolName, string> = {
+  goto_slide:
+    'Show a different slide. Call this BEFORE saying anything about content that lives on another slide.',
+  highlight: 'Visually point at one element on the current slide while you talk about it.',
+  flag_for_followup:
+    'Log a compliance follow-up: adverse_event when the user reports a patient side effect, off_label for uses outside the label, out_of_scope for anything the deck cannot answer.',
+  resume_presentation:
+    'Continue the scripted presentation from where it was interrupted. Call when the user agrees to continue or just acknowledges.',
+};
+
+export interface FunctionToolDef {
+  type: 'function';
+  name: ToolName;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+export function toolDefinitions(): FunctionToolDef[] {
+  return TOOL_NAMES.map((name) => {
+    // z.toJSONSchema adds a "$schema" key the Realtime API doesn't need.
+    const { $schema: _s, ...parameters } = z.toJSONSchema(TOOL_ARGS[name]) as Record<string, unknown>;
+    return { type: 'function', name, description: DESCRIPTIONS[name], parameters };
+  });
+}
