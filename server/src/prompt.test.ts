@@ -22,6 +22,7 @@ describe('buildInstructions', () => {
 
   it('carries the non-negotiable rules', () => {
     expect(prompt).toMatch(/call goto_slide FIRST/);
+    expect(prompt).toMatch(/Make all tool calls before you speak/);
     expect(prompt).toMatch(/Never invent numbers/);
     expect(prompt).toMatch(/adverse_event/);
     expect(prompt).toMatch(/off_label/);

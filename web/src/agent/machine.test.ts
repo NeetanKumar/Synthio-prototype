@@ -9,12 +9,13 @@ const slides: PublicSlide[] = ['s1', 's2', 's3'].map((id) => ({
   elements: [{ kind: 'bullet', id: `${id}-a`, text: 'x' }],
 }));
 
-/** Feed inputs in order; return final state and every command emitted. */
-function run(inputs: Input[], start: MachineState = initialState(slides)) {
+/** Feed inputs in order (optionally with a timestamp); return final state and all commands. */
+function run(inputs: Array<Input | [Input, number]>, start: MachineState = initialState(slides)) {
   let state = start;
   const commands: Command[] = [];
-  for (const i of inputs) {
-    const r = reduce(state, i);
+  for (const entry of inputs) {
+    const [i, at] = Array.isArray(entry) ? entry : [entry, 0];
+    const r = reduce(state, i, at);
     state = r.state;
     commands.push(...r.commands);
   }
@@ -74,7 +75,7 @@ describe('interruption', () => {
     expect(sent(commands)).toContain('output_audio_buffer.clear');
     expect(state.agent).toBe('listening');
     expect(state.mode).toBe('answering');
-    expect(state.resumeSlideId).toBe('s1');
+    expect(state.resume?.slideId).toBe('s1');
     expect(state.turns.find((t) => t.id === 'a1')?.status).toBe('interrupted');
     // Late audio-stopped for the cancelled response must NOT advance the deck.
     const after = run([done('r1', 'cancelled'), stopped('r1')], state);
@@ -187,5 +188,101 @@ describe('errors', () => {
     const st = run([{ type: 'connected' }, srv({ type: 'error', error: { type: 'invalid_request_error', code: 'conversation_already_has_active_response', message: 'x' } })]).state;
     expect(st.response).toBeNull();
     expect(st.queued).toMatchObject({ kind: 'present', slideId: 's1' });
+  });
+});
+
+const delta = (resp: string, item: string, text: string) =>
+  srv({ type: 'response.output_audio_transcript.delta', response_id: resp, item_id: item, delta: text });
+const cleared = (id: string) => srv({ type: 'output_audio_buffer.cleared', response_id: id });
+const telemetry = (cmds: Command[]) => cmds.flatMap((c) => (c.type === 'telemetry' ? [c.event] : []));
+const cueText = (cmds: Command[]) =>
+  cmds.flatMap((c) => (c.type === 'send' && c.event.type === 'conversation.item.create' && c.event.item.type === 'message' ? [c.event.item.content[0]!.text] : []));
+
+describe('narration cursor', () => {
+  it('resumes after the last sentence actually heard, not the last one generated', () => {
+    const text = 'First point here. Second point follows. Third point is never heard.';
+    // ~0.0145 chars/ms: 1,900 ms of audio ≈ 27 chars, i.e. only the first sentence.
+    const st = run([[{ type: 'connected' }, 0], [created('r1', 'present', 's1'), 0], [delta('r1', 'a1', text), 10], [started('r1'), 100], [speech(), 2000]]).state;
+    expect(st.turns.find((t) => t.id === 'a1')).toMatchObject({ status: 'interrupted', heardChars: 28 });
+    expect(st.resume).toEqual({ slideId: 's1', lastSentence: 'First point here.' });
+    const r = run([done('r1', 'cancelled'), { type: 'user_resume' }], st);
+    expect(cueText(r.commands)[0]).toContain('The last sentence the user heard was: "First point here."');
+  });
+
+  it('falls back to restarting the slide if nothing complete was heard', () => {
+    const st = run([[{ type: 'connected' }, 0], [created('r1', 'present', 's1'), 0], [delta('r1', 'a1', 'A long opening sentence that is cut.'), 0], [started('r1'), 0], [speech(), 300]]).state;
+    expect(st.resume).toEqual({ slideId: 's1', lastSentence: null });
+  });
+});
+
+describe('highlight during presentation', () => {
+  it('a present response that only highlights is continued as a present response, not resumed', () => {
+    const st = run([{ type: 'connected' }, created('r1', 'present', 's1'), tool('r1', 'highlight', { element_id: 's1-a' })]).state;
+    expect(st.highlightId).toBe('s1-a');
+    const r = run([done('r1', 'completed', false)], st);
+    expect(cueText(r.commands)).toEqual([]); // no new cue, just continue
+    expect(responseCreates(r.commands)).toEqual([{ kind: 'present', slide_id: 's1' }]);
+    // ...and auto-advance still works when that continuation finishes playing.
+    const r2 = run([created('r2', 'present', 's1'), started('r2'), done('r2'), stopped('r2')], r.state);
+    expect(r2.state.slideId).toBe('s2');
+  });
+
+  it('highlight is cleared when the slide changes', () => {
+    const st = run([{ type: 'connected' }, created('r1', 'present', 's1'), tool('r1', 'highlight', { element_id: 's1-a' }), { type: 'user_navigate', slideId: 's2' }]).state;
+    expect(st.highlightId).toBeNull();
+  });
+});
+
+describe('metrics and telemetry', () => {
+  it('measures time-to-first-audio from end of speech', () => {
+    const st = run([[speech(), 0], [srv({ type: 'input_audio_buffer.speech_stopped', item_id: 'u1' }), 1000], [created('r2'), 1100], [started('r2'), 1640]], speakingS1().state);
+    expect(st.state.metrics.ttfaMs).toEqual([640]);
+    expect(telemetry(st.commands)).toContainEqual({ type: 'latency', metric: 'ttfa', ms: 640 });
+  });
+
+  it('measures interrupt-to-silence until the server confirms the buffer is cleared', () => {
+    const base = run([[{ type: 'connected' }, 0], [created('r1', 'present', 's1'), 0], [started('r1'), 0]]).state;
+    const r = run([[speech(), 5000], [cleared('r1'), 5180]], base);
+    expect(r.state.metrics.interruptMs).toEqual([180]);
+    expect(r.state.metrics.interruptions).toBe(1);
+    expect(r.state.agent).toBe('listening'); // user still talking
+  });
+
+  it('attributes a question to the slide its answer landed on', () => {
+    let st = run([speech('u9'), created('r2'), tool('r2', 'goto_slide', { slide_id: 's3', reason: 'q' })], speakingS1().state).state;
+    const a = run([done('r2', 'completed', false), created('r3'), started('r3'), done('r3')], st);
+    st = a.state;
+    // Transcript arrives late: the question is reported once both pieces exist.
+    expect(telemetry(a.commands).filter((e) => e.type === 'question')).toEqual([]);
+    const b = run([srv({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'u9', transcript: ' What about efficacy? ' })], st);
+    expect(telemetry(b.commands)).toContainEqual({ type: 'question', text: 'What about efficacy?', slideId: 's3', via: 'voice' });
+  });
+
+  it('"yes, continue" is not recorded as a question', () => {
+    const st = run(
+      [speech('u1'), srv({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'u1', transcript: 'yes go on' }), created('r2'), tool('r2', 'resume_presentation', {})],
+      speakingS1().state,
+    ).state;
+    expect(st.questions).toEqual([]);
+  });
+
+  it('logs slide changes with who caused them', () => {
+    const r = run([{ type: 'user_navigate', slideId: 's2' }], speakingS1().state);
+    expect(telemetry(r.commands)).toContainEqual({ type: 'slide_change', from: 's1', to: 's2', by: 'user' });
+  });
+});
+
+describe('connection drop', () => {
+  it('re-seeds the new session with a recap and resumes the interrupted slide', () => {
+    let st = run([delta('r1', 'a1', 'Opening line. More.'), { type: 'disconnected' }], speakingS1().state).state;
+    expect(st.agent).toBe('reconnecting');
+    expect(st.response).toBeNull();
+    const r = run([{ type: 'reconnected' }], st);
+    st = r.state;
+    const cue = cueText(r.commands)[0]!;
+    expect(cue).toContain('connection dropped and was restored');
+    expect(cue).toContain('Slides covered so far: s1');
+    expect(cue).toContain('resume slide s1');
+    expect(st.response?.id).toBe(PENDING);
   });
 });

@@ -1,7 +1,9 @@
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { PublicDeck } from '@msl/shared';
 import { AgentController } from './agent/controller.ts';
 import { Orb } from './ui/Orb.tsx';
+import { CallNotesView, Captions, Countdown, DevHud, FlagToasts, MicMeter, TextAsk } from './ui/Panels.tsx';
 import { Stage, ThumbRail } from './ui/Stage.tsx';
 
 const params = new URLSearchParams(location.search);
@@ -15,7 +17,10 @@ export function App() {
   useEffect(() => {
     fetch(`/api/decks/${encodeURIComponent(DECK_ID)}`)
       .then((r) => (r.ok ? (r.json() as Promise<PublicDeck>) : Promise.reject(new Error(`Deck "${DECK_ID}" not found`))))
-      .then(setDeck)
+      .then((d) => {
+        document.title = `${d.title.split('(')[0]!.trim()} · MSL·Live`;
+        setDeck(d);
+      })
       .catch((e: Error) => setLoadError(e.message));
   }, []);
 
@@ -33,42 +38,49 @@ function Session({ deck }: { deck: PublicDeck }) {
   const [audioEl] = useState(() => new Audio());
   const ctl = useMemo(() => new AgentController(deck, audioEl, { deckId: DECK_ID, vad: VAD }), [deck, audioEl]);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
+  const [hud, setHud] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const m = snap.machine;
-  const live = snap.phase === 'live';
+  const live = snap.phase === 'live' || snap.phase === 'reconnecting';
 
-  useEffect(() => () => ctl.end(), [ctl]);
+  useEffect(() => () => ctl.dispose(), [ctl]);
+  useEffect(() => {
+    if (snap.phase === 'ended' || (snap.phase === 'failed' && snap.notes)) setNotesOpen(true);
+  }, [snap.phase, snap.notes]);
 
-  // Keyboard: Space = barge-in stop, arrows = navigate.
+  // Keyboard: Space = barge-in stop, arrows = navigate, D = dev HUD.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const idx = deck.slides.findIndex((s) => s.id === ctl.getSnapshot().machine.slideId);
+      const cur = ctl.getSnapshot();
+      const idx = deck.slides.findIndex((s) => s.id === cur.machine.slideId);
       if (e.code === 'Space') {
         e.preventDefault();
-        if (ctl.getSnapshot().phase === 'live') ctl.stop();
+        if (cur.phase === 'live') ctl.stop();
       } else if (e.key === 'ArrowRight' && deck.slides[idx + 1]) ctl.navigate(deck.slides[idx + 1]!.id);
       else if (e.key === 'ArrowLeft' && idx > 0) ctl.navigate(deck.slides[idx - 1]!.id);
+      else if (e.key === 'd' || e.key === 'D') setHud((h) => !h);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [ctl, deck]);
 
   const idx = deck.slides.findIndex((s) => s.id === m.slideId);
-  const lastAssistant = [...m.turns].reverse().find((t) => t.role === 'assistant');
-  const lastUser = [...m.turns].reverse().find((t) => t.role === 'user');
-  const canResume = live && (m.mode === 'paused' || m.mode === 'answering') && !m.response && m.agent !== 'speaking';
+  const canResume = snap.phase === 'live' && (m.mode === 'paused' || m.mode === 'answering') && !m.response && m.agent !== 'speaking' && m.resume !== null;
 
   return (
     <div className="mx-auto flex min-h-full max-w-[1500px] flex-col gap-5 px-4 py-5 lg:px-8">
-      <header className="flex items-center justify-between gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-baseline gap-3">
           <span className="font-serif text-2xl italic text-paper">MSL·Live</span>
           <span className="hidden text-sm text-mist sm:inline">{deck.title}</span>
         </div>
-        <div className="flex items-center gap-4">
-          {live || snap.phase === 'ended' ? <Orb state={m.agent} /> : null}
+        <div className="flex items-center gap-5">
+          {live && <MicMeter getLevel={ctl.getMicLevel} disabled={snap.micDenied} />}
+          {live && <Orb state={m.agent} />}
+          {live && snap.deadline && <Countdown deadline={snap.deadline} />}
           {live ? (
-            <button onClick={() => ctl.end()} className="rounded-full border border-white/15 px-4 py-2 text-sm text-mist hover:border-alert hover:text-alert">
+            <button onClick={() => void ctl.end()} className="rounded-full border border-white/15 px-4 py-2 text-sm text-mist hover:border-alert hover:text-alert">
               End call
             </button>
           ) : (
@@ -77,28 +89,36 @@ function Session({ deck }: { deck: PublicDeck }) {
               disabled={snap.phase === 'starting'}
               className="rounded-full bg-teal px-5 py-2 text-sm font-medium text-paper shadow-[0_0_0_4px_rgba(14,110,107,0.25)] hover:bg-[#12807c] disabled:opacity-60"
             >
-              {snap.phase === 'starting' ? 'Connecting…' : snap.phase === 'ended' ? 'Start again' : 'Start briefing'}
+              {snap.phase === 'starting' ? 'Connecting…' : snap.phase === 'ended' || snap.phase === 'failed' ? 'Start again' : 'Start briefing'}
             </button>
           )}
         </div>
       </header>
 
       {snap.error && <div className="rounded-lg border border-alert/40 bg-alert/10 px-4 py-2 text-sm text-alert">{snap.error}</div>}
+      {snap.phase === 'reconnecting' && (
+        <div className="rounded-lg border border-laser/40 bg-laser/10 px-4 py-2 text-sm text-laser">Connection dropped. Reconnecting and restoring context…</div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_220px]">
-        <main className="flex flex-col gap-4">
+        <main className="flex min-w-0 flex-col gap-4">
           <Stage deck={deck} slideId={m.slideId} highlightId={m.highlightId} />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <CtlButton onClick={() => idx > 0 && ctl.navigate(deck.slides[idx - 1]!.id)} disabled={idx <= 0} label="Previous slide">←</CtlButton>
-              <CtlButton onClick={() => deck.slides[idx + 1] && ctl.navigate(deck.slides[idx + 1]!.id)} disabled={idx >= deck.slides.length - 1} label="Next slide">→</CtlButton>
+              <CtlButton onClick={() => idx > 0 && ctl.navigate(deck.slides[idx - 1]!.id)} disabled={idx <= 0} label="Previous slide">
+                ←
+              </CtlButton>
+              <CtlButton onClick={() => deck.slides[idx + 1] && ctl.navigate(deck.slides[idx + 1]!.id)} disabled={idx >= deck.slides.length - 1} label="Next slide">
+                →
+              </CtlButton>
+              {!live && snap.phase !== 'ended' && <span className="ml-2 text-sm text-mist">Browse freely; the agent takes over when you start.</span>}
             </div>
             {live && (
               <div className="flex items-center gap-2">
                 {canResume && (
                   <button onClick={ctl.resume} className="rounded-full border border-teal/60 px-4 py-2 text-sm text-[#4fd1c5] hover:bg-teal/20">
-                    Resume presentation
+                    ↻ Resume presentation
                   </button>
                 )}
                 <button onClick={ctl.stop} className="rounded-full bg-white/10 px-4 py-2 text-sm hover:bg-white/15" title="Space">
@@ -106,25 +126,17 @@ function Session({ deck }: { deck: PublicDeck }) {
                 </button>
               </div>
             )}
+            {snap.phase === 'ended' && !notesOpen && (
+              <button onClick={() => setNotesOpen(true)} className="rounded-full bg-white/10 px-4 py-2 text-sm hover:bg-white/15">
+                View call notes
+              </button>
+            )}
           </div>
 
-          {/* Minimal captions (full caption panel lands in P1). */}
           {live && (
-            <div className="grid gap-2 rounded-xl bg-night-2 p-4 text-sm ring-1 ring-white/5">
-              {lastUser && (
-                <p className="text-mist">
-                  <span className="mr-2 font-mono text-xs uppercase tracking-wider">You</span>
-                  {lastUser.text || '…'}
-                </p>
-              )}
-              {lastAssistant && (
-                <p className={lastAssistant.status === 'interrupted' ? 'text-[#e8c48a]' : 'text-paper'}>
-                  <span className="mr-2 font-mono text-xs uppercase tracking-wider text-[#4fd1c5]">Agent</span>
-                  {lastAssistant.text}
-                  {lastAssistant.status === 'interrupted' && <span className="ml-2 font-mono text-xs uppercase text-laser">— interrupted</span>}
-                </p>
-              )}
-              {snap.micDenied && <TextAsk onSend={ctl.sendText} />}
+            <div className="flex flex-col gap-3 rounded-xl bg-night-2 p-4 ring-1 ring-white/5">
+              <Captions turns={m.turns} />
+              <TextAsk onSend={ctl.sendText} micDenied={snap.micDenied} />
             </div>
           )}
         </main>
@@ -133,6 +145,16 @@ function Session({ deck }: { deck: PublicDeck }) {
           <ThumbRail deck={deck} slideId={m.slideId} onSelect={ctl.navigate} />
         </aside>
       </div>
+
+      <footer className="pb-2 text-center text-xs text-mist/70">
+        {deck.footer} · Space to interrupt · ← → to navigate · D for dev HUD
+      </footer>
+
+      <FlagToasts flags={m.flags} />
+      {hud && <DevHud m={m} model={snap.model} vad={VAD} />}
+      <AnimatePresence>
+        {notesOpen && <CallNotesView deck={deck} m={m} notes={snap.notes} loading={snap.notesLoading} onClose={() => setNotesOpen(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
@@ -142,27 +164,5 @@ function CtlButton({ children, label, ...rest }: { children: React.ReactNode; la
     <button aria-label={label} className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-lg hover:bg-white/15 disabled:opacity-30" {...rest}>
       {children}
     </button>
-  );
-}
-
-function TextAsk({ onSend }: { onSend: (t: string) => void }) {
-  const [text, setText] = useState('');
-  return (
-    <form
-      className="mt-1 flex gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSend(text);
-        setText('');
-      }}
-    >
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Microphone unavailable. Type a question…"
-        className="flex-1 rounded-lg bg-night-3 px-3 py-2 text-paper outline-none ring-1 ring-white/10 focus:ring-teal"
-      />
-      <button className="rounded-lg bg-teal px-4 text-paper">Ask</button>
-    </form>
   );
 }

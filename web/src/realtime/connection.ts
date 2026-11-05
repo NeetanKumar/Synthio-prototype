@@ -71,9 +71,9 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeCon
     send: (event) => {
       if (dc.readyState === 'open') dc.send(JSON.stringify(event));
     },
+    // Mic tracks are owned by the caller (reused across reconnects), so not stopped here.
     close: () => {
       dc.close();
-      pc.getSenders().forEach((s) => s.track?.stop());
       pc.close();
     },
   };

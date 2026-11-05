@@ -3,6 +3,7 @@ import type { AgentState } from '../agent/machine.ts';
 
 const LABEL: Record<AgentState, string> = {
   connecting: 'Connecting',
+  reconnecting: 'Reconnecting',
   idle: 'Ready',
   listening: 'Listening',
   thinking: 'Thinking',
@@ -14,6 +15,7 @@ const LABEL: Record<AgentState, string> = {
 
 const COLOR: Record<AgentState, string> = {
   connecting: '#8fa1ae',
+  reconnecting: '#f2a93b',
   idle: '#8fa1ae',
   listening: '#4fd1c5',
   thinking: '#7cc4e8',
@@ -47,7 +49,7 @@ export function Orb({ state, size = 44 }: { state: AgentState; size?: number }) 
           transition={{ duration: state === 'interrupted' ? 0.35 : 1.4, repeat: state === 'listening' ? Infinity : 0 }}
         />
         {/* thinking arc */}
-        {(state === 'thinking' || state === 'connecting') && (
+        {(state === 'thinking' || state === 'connecting' || state === 'reconnecting') && (
           <motion.svg viewBox="0 0 40 40" className="absolute inset-0" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
             <circle cx="20" cy="20" r="18" fill="none" stroke={c} strokeWidth="2" strokeDasharray="28 85" strokeLinecap="round" />
           </motion.svg>
