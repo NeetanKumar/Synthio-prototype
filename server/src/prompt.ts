@@ -1,10 +1,9 @@
-import { highlightableIds, type Deck, type Element, type Slide } from '@msl/shared';
+import { CUE_PREFIX, highlightableIds, type Deck, type Element, type Slide } from '@msl/shared';
+
+export { CUE_PREFIX };
 
 // The system prompt is built from the deck, so swapping the JSON swaps the topic.
 // It never leaves the server: it is baked into the ephemeral session config.
-
-/** Marker the client uses for "director" messages (slide cues, navigation). */
-export const CUE_PREFIX = '[cue]';
 
 function describeElement(el: Element): string {
   switch (el.kind) {
