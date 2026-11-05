@@ -265,8 +265,8 @@ export function CallNotesView({
               {questions.map((q, i) => (
                 <li key={i} className="flex items-baseline justify-between gap-4 border-b border-rule pb-2">
                   <span>“{q.text}”</span>
-                  <span className="shrink-0 rounded-full bg-teal-soft px-2.5 py-0.5 font-mono text-[11px] text-teal">
-                    → {num(q.slideId)} {q.slideTitle.slice(0, 28)}
+                  <span className="max-w-[45%] shrink-0 truncate rounded-full bg-teal-soft px-2.5 py-0.5 font-mono text-[11px] text-teal" title={q.slideTitle}>
+                    → {num(q.slideId)} {q.slideTitle}
                   </span>
                 </li>
               ))}

@@ -1,0 +1,32 @@
+# fly launch --no-deploy --copy-config  (then: fly volumes create msl_data --size 1)
+app = "msl-live-api"
+primary_region = "iad"
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/msl.db"
+  # Comma-separated. Only needed for direct calls; the Vercel rewrite is same-origin.
+  WEB_ORIGIN = "https://msl-live.vercel.app"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Keep one machine up: the session hang-up timers live in memory.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[mounts]]
+  source = "msl_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "512mb"
+  cpus = 1

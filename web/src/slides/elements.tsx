@@ -43,7 +43,7 @@ export function ChartEl({ el, highlightId, compact = false }: { el: Of<'chart'>;
   const focus = el.groups.some((g) => g.id === highlightId) ? highlightId : null;
   const dim = (id: string) => (focus && focus !== id ? 0.25 : 1);
   // Headroom above the tallest bar for its value label, rounded to a tidy tick.
-  const yMax = Math.ceil((Math.max(...el.groups.flatMap((g) => g.values)) * 1.2) / 10) * 10;
+  const yMax = niceCeil(Math.max(...el.groups.flatMap((g) => g.values)) * 1.15);
   return (
     <figure className="flex h-full flex-col">
       <figcaption className="mb-[0.8cqw] flex items-center justify-between">
@@ -58,7 +58,7 @@ export function ChartEl({ el, highlightId, compact = false }: { el: Of<'chart'>;
           <BarChart data={data} barGap={4} barCategoryGap="22%" margin={compact ? { top: 4, right: 0, bottom: 0, left: 0 } : { top: 28, right: 4, bottom: 0, left: -18 }}>
             <CartesianGrid vertical={false} stroke="var(--color-rule)" />
             <XAxis dataKey="label" hide={compact} tickLine={false} axisLine={false} tick={{ fill: 'var(--color-ink)', fontSize: 13, fontFamily: 'IBM Plex Sans' }} />
-            <YAxis hide={compact} domain={[0, yMax]} tickLine={false} axisLine={false} tick={{ fill: 'var(--color-ink-soft)', fontSize: 11, fontFamily: 'IBM Plex Mono' }} unit={el.unit} />
+            <YAxis hide={compact} domain={[0, yMax]} tickCount={6} allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: 'var(--color-ink-soft)', fontSize: 11, fontFamily: 'IBM Plex Mono' }} unit={el.unit} />
             <Bar dataKey="a" radius={[3, 3, 0, 0]} isAnimationActive={!compact} animationDuration={900}>
               {data.map((d) => (
                 <Cell key={d.id} fill="var(--color-teal)" fillOpacity={dim(d.id)} />
@@ -77,6 +77,14 @@ export function ChartEl({ el, highlightId, compact = false }: { el: Of<'chart'>;
       {el.footnote && <p className="mt-[0.6cqw] text-[1.05cqw] text-ink-soft">{el.footnote}</p>}
     </figure>
   );
+}
+
+/** Round up to a "nice" axis max (…, 60, 75, 80, 100, 150, …) so ticks land on round numbers. */
+function niceCeil(v: number): number {
+  if (v <= 0) return 1;
+  const pow = 10 ** Math.floor(Math.log10(v));
+  const step = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5, 8, 10].find((x) => x * pow >= v) ?? 10;
+  return step * pow;
 }
 
 function Legend({ color, label }: { color: string; label: string }) {
