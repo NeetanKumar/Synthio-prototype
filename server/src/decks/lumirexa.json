@@ -31,7 +31,7 @@
       "elements": [
         { "kind": "flow", "id": "moa-flow", "steps": [
           { "id": "moa-cytokines", "label": "IL-4 · IL-13 · IL-31", "caption": "Type 2 cytokines bind receptors on skin and nerve cells" },
-          { "id": "moa-jak1", "label": "JAK1", "caption": "Receptor-associated kinase is activated", "blocked": true },
+          { "id": "moa-jak1", "label": "JAK1", "caption": "Receptor-associated kinase is activated", "blockedBy": "tavrocitinib" },
           { "id": "moa-stat", "label": "STAT", "caption": "Signal reaches the nucleus" },
           { "id": "moa-response", "label": "Itch · inflammation", "caption": "Barrier damage and itch signalling" }
         ] },

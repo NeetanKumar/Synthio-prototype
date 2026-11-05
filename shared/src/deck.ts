@@ -58,7 +58,7 @@ const Flow = z.object({
         id: IdSchema,
         label: z.string(),
         caption: z.string(),
-        blocked: z.boolean().optional(),
+        blockedBy: z.string().optional(),
       }),
     )
     .min(2),

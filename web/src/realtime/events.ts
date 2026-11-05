@@ -32,7 +32,7 @@ const ServerEvent = z.discriminatedUnion('type', [
 
 export type ServerEvent = z.infer<typeof ServerEvent>;
 
-const KNOWN = new Set(ServerEvent.options.map((o) => o.shape.type.value));
+const KNOWN: ReadonlySet<string> = new Set(ServerEvent.options.map((o) => o.shape.type.value));
 
 /** Returns null for events we don't handle (or that are malformed). */
 export function parseServerEvent(raw: string): ServerEvent | null {

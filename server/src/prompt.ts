@@ -23,7 +23,7 @@ function describeElement(el: Element): string {
     }
     case 'flow': {
       const steps = el.steps
-        .map((s) => `  - (${s.id}) ${s.label}: ${s.caption}${s.blocked ? ' [blocked by drug]' : ''}`)
+        .map((s) => `  - (${s.id}) ${s.label}: ${s.caption}${s.blockedBy ? ` [blocked by ${s.blockedBy}]` : ''}`)
         .join('\n');
       return `- (${el.id}) pathway diagram\n${steps}`;
     }
