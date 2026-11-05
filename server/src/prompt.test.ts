@@ -47,6 +47,12 @@ describe('buildInstructions', () => {
 });
 
 describe('deck schema', () => {
+  it('ships a second, unrelated deck behind ?deck=', () => {
+    const other = loadDecks().get('voice-latency')!;
+    expect(other.slides.length).toBeGreaterThanOrEqual(4);
+    expect(buildInstructions(other)).not.toContain('tavrocitinib');
+  });
+
   it('rejects duplicate element ids across slides', () => {
     const dup = structuredClone(deck);
     dup.slides[1]!.elements[0] = { kind: 'bullet', id: 'need-itch', text: 'dup' };

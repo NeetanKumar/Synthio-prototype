@@ -63,13 +63,13 @@ export function ChartEl({ el, highlightId, compact = false }: { el: Of<'chart'>;
               {data.map((d) => (
                 <Cell key={d.id} fill="var(--color-teal)" fillOpacity={dim(d.id)} />
               ))}
-              {!compact && <LabelList dataKey="a" position="top" formatter={(v) => `${String(v)}%`} style={{ fill: 'var(--color-ink)', fontFamily: 'IBM Plex Mono', fontSize: 13 }} />}
+              {!compact && <LabelList dataKey="a" position="top" formatter={(v) => `${String(v)}${el.unit}`} style={{ fill: 'var(--color-ink)', fontFamily: 'IBM Plex Mono', fontSize: 13 }} />}
             </Bar>
             <Bar dataKey="b" radius={[3, 3, 0, 0]} isAnimationActive={!compact} animationDuration={900}>
               {data.map((d) => (
                 <Cell key={d.id} fill="var(--color-vehicle)" fillOpacity={dim(d.id)} />
               ))}
-              {!compact && <LabelList dataKey="b" position="top" formatter={(v) => `${String(v)}%`} style={{ fill: 'var(--color-ink-soft)', fontFamily: 'IBM Plex Mono', fontSize: 12 }} />}
+              {!compact && <LabelList dataKey="b" position="top" formatter={(v) => `${String(v)}${el.unit}`} style={{ fill: 'var(--color-ink-soft)', fontFamily: 'IBM Plex Mono', fontSize: 12 }} />}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

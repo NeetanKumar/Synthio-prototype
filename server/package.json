@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts"
+    "start": "tsx src/index.ts",
+    "eval": "tsx src/eval/run.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",
@@ -12,9 +13,11 @@
     "@msl/shared": "*",
     "fastify": "^5.12.8",
     "tsx": "^4.20.0",
+    "ws": "^8.22.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.2"
   }
 }
