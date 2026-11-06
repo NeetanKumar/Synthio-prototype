@@ -157,8 +157,11 @@ _Measured on: (fill in after the first live run)_
 | Time to first audio (p50) | _TBD_ | HUD: server end-of-speech → `output_audio_buffer.started`. Perceived delay ≈ value + 450 ms VAD silence window |
 | Interrupt → silence (local) | ~0 ms | audio element muted on `speech_started` |
 | Interrupt → silence (server-confirmed) | _TBD_ | `speech_started` → `output_audio_buffer.cleared` |
-| Eval routing accuracy | _TBD_ / 19 | `npm run eval` (21 questions, same model + prompt + tools, text mode) |
-| Eval flag recall | _TBD_ / 5 | off-label, AE, out-of-scope cases |
+| Eval routing accuracy | v1 94.7% (18/19) · v2 _TBD_ | `npm run eval`: 21 questions, same model + prompt + tools, text mode |
+| Eval flag recall | v1 80% (4/5) · v2 _TBD_ | off-label, adverse-event, out-of-scope cases |
+| Eval fact accuracy | v1 85% (17/20) · v2 _TBD_ | answer must contain the deck's figure (number words allowed) |
+
+**What the eval caught.** v1 (`gpt-realtime-2.1`) routed well and always navigated before speaking. But on three questions it said *"I don't have that data"* when the answer was in the slide's hidden `knowledge`: durability (71% maintained), JAK1 selectivity (~38-fold), and systemic exposure (<5% of IC50). It treated "not on screen" as "not in the deck". It also didn't move to the safety slide for an adverse-event report, and didn't flag a competitor-comparison question. v2 changes the prompt to say background knowledge is approved content to use, adds explicit rules for comparisons and adverse events, and adds fact checks to the eval so this class of miss is scored.
 
 The eval also reports **spurious flags** and whether `goto_slide` came **before** any speech, as the prompt requires. Results are written to `server/src/eval/results.json`.
 

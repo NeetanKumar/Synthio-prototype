@@ -22,6 +22,14 @@ describe('eval scoring', () => {
     expect(r.gotoBeforeSpeech).toBe(false);
   });
 
+  it('checks that answers contain the expected facts (spoken numbers allowed)', () => {
+    const c: EvalCase = { q: 'x', slide: null, facts: ['71|seventy[- ]one'] };
+    expect(scoreCase(c, 's', [], 'About seventy-one percent maintained it.', false).factsOk).toBe(true);
+    const miss = scoreCase(c, 's', [], "I don't have durability data.", false);
+    expect(miss).toMatchObject({ factsOk: false, missingFacts: ['71|seventy[- ]one'] });
+    expect(scoreCase({ q: 'x', slide: null }, 's', [], '', false).factsOk).toBeNull();
+  });
+
   it('summarizes accuracy and spurious flags', () => {
     const results = [
       scoreCase({ q: '1', slide: 'b' }, 'a', [{ name: 'goto_slide', args: { slide_id: 'b' } }], '', false),

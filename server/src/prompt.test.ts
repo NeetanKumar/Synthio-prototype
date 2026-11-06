@@ -24,6 +24,8 @@ describe('buildInstructions', () => {
     expect(prompt).toMatch(/call goto_slide FIRST/);
     expect(prompt).toMatch(/Make all tool calls before you speak/);
     expect(prompt).toMatch(/Never invent numbers/);
+    expect(prompt).toMatch(/Background knowledge is approved content/);
+    expect(prompt).toMatch(/never make a comparative claim/);
     expect(prompt).toMatch(/adverse_event/);
     expect(prompt).toMatch(/off_label/);
     expect(prompt).toContain(CUE_PREFIX);
