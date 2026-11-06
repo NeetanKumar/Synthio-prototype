@@ -55,7 +55,13 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeCon
   });
   if (!res.ok) {
     pc.close();
-    throw new Error(`WebRTC handshake failed (${res.status})`);
+    // Surface OpenAI's own reason (e.g. insufficient_quota vs rate_limit_exceeded on a 429).
+    const detail = await res
+      .json()
+      .then((b: { error?: { message?: string; code?: string } }) => b.error?.code ?? b.error?.message)
+      .catch(() => undefined);
+    const hint = detail === 'insufficient_quota' ? ' Add credit at platform.openai.com → Billing.' : '';
+    throw new Error(`OpenAI rejected the voice call (${res.status}${detail ? `: ${detail}` : ''}).${hint}`);
   }
   // Call id is the last path segment of Location; the server can hang up with it.
   const callId = res.headers.get('Location')?.split('/').pop();
