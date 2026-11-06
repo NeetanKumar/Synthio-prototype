@@ -27,6 +27,8 @@ const arg = (name: string) => {
 };
 const MODEL = arg('model') ?? process.env.REALTIME_MODEL ?? 'gpt-realtime-2.1';
 const CONCURRENCY = Number(arg('concurrency') ?? 4);
+/** Run every case N times: single runs of a sampled model are noisy. */
+const REPEAT = Math.max(1, Number(arg('repeat') ?? 1));
 const TIMEOUT_MS = 45_000;
 const MAX_ROUNDS = 4;
 
@@ -131,14 +133,15 @@ function runCase(c: EvalCase): Promise<CaseResult> {
 }
 
 async function main() {
-  console.log(`Eval: ${spec.cases.length} cases · deck ${deck.id} · model ${MODEL}\n`);
-  const results: CaseResult[] = new Array(spec.cases.length);
+  const jobs = Array.from({ length: REPEAT }, () => spec.cases).flat();
+  console.log(`Eval: ${spec.cases.length} cases × ${REPEAT} · deck ${deck.id} · model ${MODEL}\n`);
+  const results: CaseResult[] = new Array(jobs.length);
   let next = 0;
   await Promise.all(
     Array.from({ length: CONCURRENCY }, async () => {
-      while (next < spec.cases.length) {
+      while (next < jobs.length) {
         const i = next++;
-        results[i] = await runCase(spec.cases[i]!);
+        results[i] = await runCase(jobs[i]!);
         const r = results[i]!;
         const mark = r.error ? '!' : r.routingOk === false || r.flagOk === false || r.factsOk === false ? '✗' : '✓';
         console.log(`${mark} ${r.q}\n    → ${r.routedSlide}${r.expectedSlide ? ` (want ${r.expectedSlide})` : ''}${r.flags.length ? ` · flags: ${r.flags.join(',')}` : ''}${r.expectedFlag ? ` (want ${r.expectedFlag})` : ''}${r.missingFacts.length ? ` · missing facts: ${r.missingFacts.join(' ; ')}` : ''}${r.error ? ` · ERROR ${r.error}` : ''}`);
@@ -148,7 +151,7 @@ async function main() {
 
   const summary = summarize(results);
   console.log('\n', summary);
-  const out = { model: MODEL, deck: deck.id, ranAt: new Date().toISOString(), summary, results };
+  const out = { model: MODEL, deck: deck.id, repeat: REPEAT, ranAt: new Date().toISOString(), summary, results };
   writeFileSync(join(import.meta.dirname, 'results.json'), JSON.stringify(out, null, 2));
   console.log(`\nWrote server/src/eval/results.json`);
 }

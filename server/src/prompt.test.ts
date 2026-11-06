@@ -26,6 +26,8 @@ describe('buildInstructions', () => {
     expect(prompt).toMatch(/Never invent numbers/);
     expect(prompt).toMatch(/Background knowledge is approved content/);
     expect(prompt).toMatch(/never make a comparative claim/);
+    expect(prompt).toMatch(/Flag it even when the deck itself addresses the question/);
+    expect(prompt).toMatch(/Never announce navigation/);
     expect(prompt).toMatch(/adverse_event/);
     expect(prompt).toMatch(/off_label/);
     expect(prompt).toContain(CUE_PREFIX);
