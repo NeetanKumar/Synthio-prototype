@@ -12,6 +12,8 @@ A voice agent briefs a physician on **Lumirexa™ (tavrocitinib) cream 1%**, a f
 - **Live:** `https://msl-live.vercel.app` _(placeholder until deployed)_
 - **Loom:** _(placeholder)_
 
+> **Guardrails:** content rules are measured by an eval (100% routing, 100% compliance-flag recall, 95% fact accuracy); secrets, tool calls, audit trail and cost limits are enforced in code. See [Guardrails](#guardrails).
+
 ## Run it (2 commands)
 
 ```bash
@@ -35,6 +37,38 @@ Other scripts:
 - `npm test`: 63 unit tests.
 - `npm run typecheck`: strict TS across all packages.
 - `npm run eval`: routing eval against the live model.
+
+---
+
+## Guardrails
+
+Built for a regulated setting: an AI talking to physicians about a drug. Some guardrails are **enforced in code** and cannot be talked around. Others are **instructed in the prompt** and **measured by the eval**, because a speech-to-speech model speaks as it generates and nothing can check the text first. Both kinds are listed below, with the evidence.
+
+### Enforced in code (deterministic)
+
+| Guardrail | How |
+|---|---|
+| Secrets and prompt never reach the browser | The server mints a 60-second ephemeral key with the instructions and tools baked in. `GET /api/decks/:id` strips speaker notes and hidden knowledge. |
+| The agent can only do what the tools allow | Every tool argument is validated with zod. Unknown slide or element IDs are rejected and sent back to the model with the valid list. |
+| Compliance audit trail | Every `flag_for_followup` (adverse event, off-label, out of scope) is shown to the user as a toast and logged to SQLite with timestamp and slide. |
+| Call notes can't invent facts | Questions, flags, slides and latencies come from the event log. The text model only writes the prose and *selects* real questions from logged utterances; it can't add any. The summary mentions pharmacovigilance only if an adverse event was actually logged. |
+| Synthetic-data disclosure | Every slide footer says "Fictional product. Synthetic data. Demo only."; the agent says so if asked. |
+| Cost and abuse limits | Per-IP rate limit; per-session time budget enforced by a **server-side hang-up**; caps on events per session and on request size. |
+
+### Instructed in the prompt, measured by the eval
+
+v3 results: 21 questions × 3 runs; see [Results](#results).
+
+| Guardrail | Agent behaviour | Evidence |
+|---|---|---|
+| Grounded answers only | Answers only from slide content plus approved background knowledge, in 3 sentences or fewer. Never invents numbers, studies or doses. | Fact accuracy 95% (57/60) |
+| No comparative claims | "Is it better than X?" → states only that no head-to-head data exists, and flags it | Included in flag recall 100% |
+| Off-label | Unstudied ages, combinations or indications → says it's outside the label, doesn't advise, flags `off_label` | Flag recall 100% (15/15) |
+| Adverse events | Moves to the safety slide, flags `adverse_event`, refers to pharmacovigilance, gives no patient-specific medical advice | Routed and flagged 3/3 |
+| Unknown or out of scope | "I don't have data on that" and flags `out_of_scope`; never guesses | Spurious flags: 0 |
+| Garbled speech | Asks the user to repeat instead of guessing or flagging (added after a live test produced a hallucinated answer) | New eval case |
+
+**Limit, stated plainly:** the prompt-level guardrails are *measured*, not *guaranteed*. One known miss remains (an exposure question answered without its figure). For production I'd gate claims before they are spoken, using MLR-approved answer snippets or a claims checker; see [Trade-offs](#trade-offs-speech-to-speech-vs-a-cascaded-stt--llm--tts-pipeline).
 
 ---
 
