@@ -26,6 +26,7 @@ describe('call-notes summary', () => {
   });
   it('only mentions pharmacovigilance when an adverse event was flagged', () => {
     expect(summaryPrompt(deck, base)).toContain('do not mention pharmacovigilance');
+    expect(summaryPrompt(deck, base)).toContain('Never mention utterances');
     expect(summaryPrompt(deck, { ...base, flags: [{ flag: 'adverse_event', summary: 'rash', slideId: 'safety' }] })).toContain('routed to pharmacovigilance');
   });
 });

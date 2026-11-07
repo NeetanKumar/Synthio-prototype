@@ -303,6 +303,23 @@ describe('voice navigation and ending', () => {
     expect(r2.state.slideId).toBe('s3');
   });
 
+  it('"previous slide" with goto and resume in separate turns stays on the new slide (live bug)', () => {
+    // Presenting s2, user says "go back". Model: goto(s1) in r2, then resume in the follow-up r3.
+    let st = run([{ type: 'connected' }, created('r1', 'present', 's1'), started('r1'), done('r1'), stopped('r1')]).state; // now presenting s2
+    st = run([created('r2b', 'present', 's2'), started('r2b'), speech('u1'), done('r2b', 'cancelled'), created('r2')], st).state;
+    st = run([tool('r2', 'goto_slide', { slide_id: 's1', reason: 'user asked to go back' }), done('r2', 'completed', false)], st).state;
+    expect(st.slideId).toBe('s1');
+    const r = run([created('r3'), tool('r3', 'resume_presentation', {}), done('r3', 'completed', false)], st);
+    expect(r.state.slideId).toBe('s1'); // previously jumped back to s2
+    expect(cueText(r.commands)[0]).toContain('navigated to slide s1');
+  });
+
+  it('after an answer on another slide, "yes, carry on" (new user turn) returns to the interrupted slide', () => {
+    let st = run([tool('r2', 'goto_slide', { slide_id: 's3', reason: 'q' }), done('r2', 'completed', false), created('r3'), started('r3'), done('r3'), stopped('r3')], answering()).state;
+    st = run([speech('u2'), created('r4'), tool('r4', 'resume_presentation', {}), done('r4', 'completed', false)], st).state;
+    expect(st.slideId).toBe('s1');
+  });
+
   it('plain resume (no goto) still returns to the interrupted slide', () => {
     const st = run([tool('r2', 'resume_presentation', {}), done('r2', 'completed', false)], answering()).state;
     expect(st.slideId).toBe('s1');

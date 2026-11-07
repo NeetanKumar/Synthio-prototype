@@ -31,8 +31,6 @@ interface ActiveResponse {
   slideId: string;
   /** What to do after response.done because of tool calls in this response. */
   after: 'continue' | 'resume' | null;
-  /** goto_slide target in this response. With resume_presentation it means "present from here". */
-  navTo: string | null;
 }
 
 export interface Turn {
@@ -91,6 +89,8 @@ export interface MachineState {
   pendingHighlightId: string | null;
   /** end_call was requested: close the call once the goodbye has played. */
   ending: boolean;
+  /** Slide the agent navigated to since the user last spoke. A resume then continues from it. */
+  turnGoto: string | null;
   /** In-flight generation (at most one). */
   response: ActiveResponse | null;
   /** A response we want once the current one ends. Latest wins. */
@@ -149,6 +149,7 @@ export function initialState(slides: PublicSlide[]): MachineState {
     highlightId: null,
     pendingHighlightId: null,
     ending: false,
+    turnGoto: null,
     response: null,
     queued: null,
     lastRequest: null,
@@ -226,7 +227,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
   const emit = (req: Request) => {
     s.lastRequest = req;
     const kind: Kind = req.kind === 'continue' ? req.as : req.kind;
-    s.response = { id: PENDING, kind, slideId: req.slideId, after: null, navTo: null };
+    s.response = { id: PENDING, kind, slideId: req.slideId, after: null };
     if (s.agent !== 'listening') s.agent = 'thinking';
 
     if (req.kind === 'present') {
@@ -403,6 +404,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
       stopOutput();
       if (wasPresenting) s.resume = cursorFor(s.slideId);
       s.mode = 'answering';
+      s.turnGoto = null;
       s.waitStartAt = now;
       s.turns = [...s.turns, { id: input.id, role: 'user', text: input.text, status: 'done' }];
       s.questions = [...s.questions, { id: input.id, text: input.text, slideId: null, via: 'text', reported: false }];
@@ -441,6 +443,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
         if (s.mode === 'presenting') s.mode = 'answering';
         s.queued = null;
         s.lastPresent = null;
+        s.turnGoto = null; // a new user turn: earlier navigation no longer pending
         s.agent = 'listening';
         if (!s.turns.some((t) => t.id === ev.item_id)) {
           s.turns = [...s.turns, { id: ev.item_id, role: 'user', text: '', status: 'live' }];
@@ -470,7 +473,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
         const md = ev.response.metadata ?? {};
         const kind: Kind = md.kind === 'present' ? 'present' : 'answer';
         // Ours (metadata echoed back) or one the server VAD created from speech.
-        s.response = { id: ev.response.id, kind, slideId: md.slide_id ?? s.slideId, after: null, navTo: null };
+        s.response = { id: ev.response.id, kind, slideId: md.slide_id ?? s.slideId, after: null };
         s.metrics.responses += 1;
         if (kind === 'present' && s.narration?.slideId === s.response.slideId) {
           s.narration = { ...s.narration, baseChars: s.narration.text.length, responseId: ev.response.id };
@@ -497,6 +500,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
         const r = s.response && (s.response.id === ev.response_id || s.response.id === PENDING) ? s.response : null;
         const fx = result.effect;
         if (fx.type === 'goto') {
+          s.turnGoto = fx.slideId;
           if (s.mode === 'presenting') {
             s.resume = s.resume ?? cursorFor(s.slideId);
             s.mode = 'answering';
@@ -529,7 +533,6 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
           s.response = {
             ...r,
             after: fx.type === 'resume' ? 'resume' : (r.after ?? 'continue'),
-            navTo: fx.type === 'goto' ? fx.slideId : r.navTo,
           };
         }
         break;
@@ -559,12 +562,15 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
           reportQuestions();
         }
         if (flushQueued()) break;
-        if (r.after === 'resume' && r.navTo) {
-          // Voice navigation ("next slide", "go back"): goto + resume = present from the new slide.
+        if (r.after === 'resume' && s.turnGoto) {
+          // Voice navigation ("next slide", "go back"): goto then resume, in one turn or across
+          // the follow-up turn, means "present from the new slide", not "go back to the cursor".
+          const target = s.turnGoto;
+          s.turnGoto = null;
           flushPending();
-          showSlide(r.navTo, 'agent');
+          showSlide(target, 'agent');
           s.resume = null;
-          emit({ kind: 'present', slideId: r.navTo, cue: 'navigated' });
+          emit({ kind: 'present', slideId: target, cue: 'navigated' });
           break;
         }
         if (r.after === 'resume') {

@@ -70,6 +70,7 @@ export function summaryPrompt(deck: Deck, notes: Omit<CallNotes, 'narrative'>): 
     'Exclude greetings, acknowledgements ("ok", "good to go"), navigation or pacing commands ("next slide", "go back", "give me the summary"), stop/end requests, and unintelligible fragments.',
     '',
     'Task 2. Write a 2-3 sentence summary in neutral past tense, third person ("The physician asked..."). Use ONLY the facts below: no product claims, no numbers that are not listed.',
+    'The summary describes the conversation only. Never mention utterances, indices, Task 1 or which items were excluded. If there were no substantive questions, just say what was covered.',
     notes.flags.some((f) => f.flag === 'adverse_event')
       ? 'An adverse event was flagged: say it was routed to pharmacovigilance.'
       : 'No adverse event was flagged: do not mention pharmacovigilance or adverse event reporting.',
