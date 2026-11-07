@@ -88,19 +88,9 @@ The eval caught real bugs: the agent said "no data" when the answer was in hidde
 
 ## Future scope
 
-**Compliance and audit**
-- **Claim-level traceability.** Every spoken sentence is linked to an MLR-approved claim ID from the deck. A reviewer can replay any call and see which approved claim backed each sentence, and which sentences had no backing.
-- **Structured adverse-event intake.** Capture the four minimum elements of a valid report (patient, reporter, product, event) in the conversation, then draft an ICH E2B(R3) case for pharmacovigilance within the regulatory clock.
-- **Tamper-evident audit log.** Hash-chained events, plus transcript and audio retained per policy. Every flag goes to a reviewer queue with owner and SLA.
-- **Claims gate before speech.** Answers about efficacy and safety are spoken from pre-approved snippets, or passed through a claims checker, instead of free generation.
-
-**Product**
-- **Medical-affairs insights.** Aggregate questions across calls into themes, e.g. what share of dermatologists ask about durability beyond week 16. That is a core MSL deliverable, and today it's done by hand.
-- **Personalised briefings.** Adapt depth and order to specialty and history from the CRM: an allergist hears more mechanism, a returning physician skips what they've seen. Call notes go back to the CRM (e.g. Veeva).
-- **Phone and human handoff.** Physicians call a number over SIP, which OpenAI Realtime supports. The agent transfers to a human MSL with context (`calls/{id}/refer`) when asked or when a flag needs a person.
-- **Patient mode.** The same engine with a lay-language deck, a reading-level check, stricter adverse-event capture, and explicit consent.
-- **Multilingual.** The same approved content in the physician's language; the deck schema is language-agnostic.
-
-**Quality**
-- **Eval as a release gate.** Run the eval in CI on every prompt or deck change, plus an audio-mode eval with synthesized physician voices, accents and background noise, and a red-team suite (prompt injection, off-label fishing).
-- **Faster barge-in.** Client-side voice detection mutes even before the server detects speech; server detection confirms.
+- **Claim traceability:** link every spoken sentence to an MLR-approved claim ID.
+- **Adverse-event intake:** capture the 4 minimum elements and draft an ICH E2B(R3) case.
+- **Audit:** tamper-evident log, plus a reviewer queue with an owner and SLA per flag.
+- **Insights:** question themes across calls for medical affairs; call notes synced to CRM.
+- **Phone + human handoff:** SIP calls, with transfer to a human MSL.
+- **Eval in CI:** release gate, audio-mode eval and a red-team suite.
