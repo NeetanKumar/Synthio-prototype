@@ -7,6 +7,8 @@ export interface EvalCase {
   flag?: 'adverse_event' | 'off_label' | 'out_of_scope';
   /** Case-insensitive regexes that must ALL match the answer (checks it used the deck's facts). */
   facts?: string[];
+  /** Tools that must be called (conversation control: navigation, resume, end). */
+  tools?: string[];
 }
 
 export interface ToolCall {
@@ -27,6 +29,8 @@ export interface CaseResult {
   /** null when the case has no fact checks. */
   factsOk: boolean | null;
   missingFacts: string[];
+  /** null when the case expects no particular tools. */
+  toolsOk: boolean | null;
   answer: string;
   error?: string;
 }
@@ -47,6 +51,7 @@ export function scoreCase(c: EvalCase, startSlide: string, calls: ToolCall[], an
     flagOk: error ? false : c.flag ? flags.includes(c.flag) : null,
     factsOk: error ? false : c.facts?.length ? missingFacts.length === 0 : null,
     missingFacts,
+    toolsOk: error ? false : c.tools?.length ? c.tools.every((t) => calls.some((x) => x.name === t)) : null,
     answer,
     ...(error ? { error } : {}),
   };
@@ -56,6 +61,7 @@ export function summarize(results: CaseResult[]) {
   const routed = results.filter((r) => r.routingOk !== null);
   const flagged = results.filter((r) => r.flagOk !== null);
   const factual = results.filter((r) => r.factsOk !== null);
+  const control = results.filter((r) => r.toolsOk !== null);
   // Flags raised on questions that expected none (false alarms).
   const spurious = results.filter((r) => r.expectedFlag === null && r.flags.length > 0).length;
   const pct = (n: number, d: number) => (d === 0 ? null : Math.round((n / d) * 1000) / 10);
@@ -66,6 +72,8 @@ export function summarize(results: CaseResult[]) {
     flagN: flagged.length,
     factAccuracy: pct(factual.filter((r) => r.factsOk).length, factual.length),
     factN: factual.length,
+    controlAccuracy: pct(control.filter((r) => r.toolsOk).length, control.length),
+    controlN: control.length,
     spuriousFlags: spurious,
     gotoBeforeSpeech: pct(results.filter((r) => r.gotoBeforeSpeech).length, results.length),
     errors: results.filter((r) => r.error).length,

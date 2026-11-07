@@ -6,6 +6,9 @@ import { z } from 'zod';
 export const GotoSlideArgs = z.object({
   slide_id: z.string().describe('ID of the slide to show. Must be one of the deck slide IDs.'),
   reason: z.string().describe('Short reason, e.g. "user asked about adverse events".'),
+  // Optional pointer on the target slide: one tool call instead of goto + highlight,
+  // which saves a full model round trip before the agent can speak.
+  element_id: z.string().optional().describe('Optional: element on the target slide to point at (same IDs as highlight).'),
 });
 
 export const HighlightArgs = z.object({
@@ -21,11 +24,14 @@ export const FlagArgs = z.object({
 
 export const ResumeArgs = z.object({});
 
+export const EndCallArgs = z.object({});
+
 export const TOOL_ARGS = {
   goto_slide: GotoSlideArgs,
   highlight: HighlightArgs,
   flag_for_followup: FlagArgs,
   resume_presentation: ResumeArgs,
+  end_call: EndCallArgs,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ARGS;
@@ -42,7 +48,8 @@ const DESCRIPTIONS: Record<ToolName, string> = {
   flag_for_followup:
     'Log a compliance follow-up: adverse_event when the user reports a patient side effect, off_label for uses outside the label, out_of_scope for anything the deck cannot answer.',
   resume_presentation:
-    'Continue the scripted presentation from where it was interrupted. Call when the user agrees to continue or just acknowledges.',
+    'Continue the scripted presentation. After goto_slide in the same turn it continues from that slide; otherwise from where it was interrupted.',
+  end_call: 'End the briefing when the user wants to stop for good. Then say one short goodbye sentence.',
 };
 
 export interface FunctionToolDef {

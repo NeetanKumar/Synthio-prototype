@@ -153,6 +153,43 @@
       "facts": [
         "head[- ]to[- ]head|no direct"
       ]
+    },
+    {
+      "q": "Next slide, please.",
+      "slide": "mechanism",
+      "tools": [
+        "goto_slide",
+        "resume_presentation"
+      ]
+    },
+    {
+      "q": "Can you skip ahead to the dosing?",
+      "slide": "dosing",
+      "tools": [
+        "goto_slide",
+        "resume_presentation"
+      ]
+    },
+    {
+      "q": "Good to go.",
+      "slide": null,
+      "tools": [
+        "resume_presentation"
+      ]
+    },
+    {
+      "q": "Okay, thank you, that's good. We can just end it here.",
+      "slide": null,
+      "tools": [
+        "end_call"
+      ]
+    },
+    {
+      "q": "Whether I have doubt, I have been still use this drug.",
+      "slide": null,
+      "facts": [
+        "repeat|again|rephrase|clarify|didn.t (quite )?catch|not sure (what|i)|could you"
+      ]
     }
   ]
 }

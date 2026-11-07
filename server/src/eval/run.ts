@@ -151,7 +151,7 @@ async function main() {
         const i = next++;
         results[i] = await runCase(jobs[i]!);
         const r = results[i]!;
-        const mark = r.error ? '!' : r.routingOk === false || r.flagOk === false || r.factsOk === false ? '✗' : '✓';
+        const mark = r.error ? '!' : r.routingOk === false || r.flagOk === false || r.factsOk === false || r.toolsOk === false ? '✗' : '✓';
         console.log(`${mark} ${r.q}\n    → ${r.routedSlide}${r.expectedSlide ? ` (want ${r.expectedSlide})` : ''}${r.flags.length ? ` · flags: ${r.flags.join(',')}` : ''}${r.expectedFlag ? ` (want ${r.expectedFlag})` : ''}${r.missingFacts.length ? ` · missing facts: ${r.missingFacts.join(' ; ')}` : ''}${r.error ? ` · ERROR ${r.error}` : ''}`);
       }
     }),

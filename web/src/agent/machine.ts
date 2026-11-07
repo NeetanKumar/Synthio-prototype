@@ -31,6 +31,8 @@ interface ActiveResponse {
   slideId: string;
   /** What to do after response.done because of tool calls in this response. */
   after: 'continue' | 'resume' | null;
+  /** goto_slide target in this response. With resume_presentation it means "present from here". */
+  navTo: string | null;
 }
 
 export interface Turn {
@@ -85,6 +87,10 @@ export interface MachineState {
   /** goto_slide received while previous audio is still audible: show it when audio ends. */
   pendingSlideId: string | null;
   highlightId: string | null;
+  /** Pointer that goes with pendingSlideId. */
+  pendingHighlightId: string | null;
+  /** end_call was requested: close the call once the goodbye has played. */
+  ending: boolean;
   /** In-flight generation (at most one). */
   response: ActiveResponse | null;
   /** A response we want once the current one ends. Latest wins. */
@@ -129,6 +135,8 @@ export type Command =
   | { type: 'mute' }
   | { type: 'unmute' }
   | { type: 'telemetry'; event: TelemetryPayload }
+  /** Close the call (after the goodbye finished playing). */
+  | { type: 'end_call' }
   | { type: 'log'; message: string };
 
 export function initialState(slides: PublicSlide[]): MachineState {
@@ -139,6 +147,8 @@ export function initialState(slides: PublicSlide[]): MachineState {
     slideId: slides[0]!.id,
     pendingSlideId: null,
     highlightId: null,
+    pendingHighlightId: null,
+    ending: false,
     response: null,
     queued: null,
     lastRequest: null,
@@ -216,7 +226,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
   const emit = (req: Request) => {
     s.lastRequest = req;
     const kind: Kind = req.kind === 'continue' ? req.as : req.kind;
-    s.response = { id: PENDING, kind, slideId: req.slideId, after: null };
+    s.response = { id: PENDING, kind, slideId: req.slideId, after: null, navTo: null };
     if (s.agent !== 'listening') s.agent = 'thinking';
 
     if (req.kind === 'present') {
@@ -280,10 +290,21 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
     });
   };
 
+  /** Apply a slide (and pointer) that waited for the previous audio to finish. */
+  const flushPending = () => {
+    if (s.pendingSlideId) showSlide(s.pendingSlideId, 'agent');
+    if (s.pendingHighlightId) s.highlightId = s.pendingHighlightId;
+    s.pendingHighlightId = null;
+  };
+
   /** Called when audio ends: show a queued slide and maybe advance the script. */
   const onSilence = (responseId: string) => {
-    if (s.pendingSlideId) showSlide(s.pendingSlideId, 'agent');
+    flushPending();
     if (s.agent === 'speaking') s.agent = 'idle';
+    if (s.ending && !s.response) {
+      cmds.push({ type: 'end_call' }); // the goodbye has played
+      return;
+    }
     if (s.narration?.responseId === responseId) s.narration = { ...s.narration, baseChars: s.narration.text.length, responseId: null };
     if (s.mode === 'presenting' && !s.response && !s.queued && s.lastPresent?.responseId === responseId) {
       const idx = s.slides.findIndex((x) => x.id === s.lastPresent!.slideId);
@@ -449,7 +470,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
         const md = ev.response.metadata ?? {};
         const kind: Kind = md.kind === 'present' ? 'present' : 'answer';
         // Ours (metadata echoed back) or one the server VAD created from speech.
-        s.response = { id: ev.response.id, kind, slideId: md.slide_id ?? s.slideId, after: null };
+        s.response = { id: ev.response.id, kind, slideId: md.slide_id ?? s.slideId, after: null, navTo: null };
         s.metrics.responses += 1;
         if (kind === 'present' && s.narration?.slideId === s.response.slideId) {
           s.narration = { ...s.narration, baseChars: s.narration.text.length, responseId: ev.response.id };
@@ -481,21 +502,36 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
             s.mode = 'answering';
           }
           // Don't flip the slide under the previous answer's still-playing audio.
-          if (s.audioResponseId && !s.muted) s.pendingSlideId = fx.slideId;
-          else showSlide(fx.slideId, 'agent');
+          if (s.audioResponseId && !s.muted) {
+            s.pendingSlideId = fx.slideId;
+            s.pendingHighlightId = fx.elementId ?? null;
+          } else {
+            showSlide(fx.slideId, 'agent');
+            if (fx.elementId) s.highlightId = fx.elementId;
+          }
         } else if (fx.type === 'highlight') {
           s.highlightId = fx.elementId;
         } else if (fx.type === 'flag') {
           const slideId = s.pendingSlideId ?? s.slideId;
           s.flags = [...s.flags, { id: ev.call_id, type: fx.flag, summary: fx.summary, slideId }];
           track({ type: 'flag', flag: fx.flag, summary: fx.summary, slideId });
-        } else if (fx.type === 'resume') {
-          // "Yes, carry on" is not a question: drop it from the call notes.
+        } else if (fx.type === 'resume' || fx.type === 'end') {
+          // "Yes, carry on", "next slide" and "let's stop" are not questions: drop them from the call notes.
           const lastQ = [...s.questions].reverse().find((q) => !q.reported);
           if (lastQ) s.questions = s.questions.filter((q) => q.id !== lastQ.id);
+          if (fx.type === 'end') {
+            s.ending = true;
+            s.resume = null;
+          }
         }
         // response.create must wait for response.done (one response at a time).
-        if (r) s.response = { ...r, after: fx.type === 'resume' ? 'resume' : (r.after ?? 'continue') };
+        if (r) {
+          s.response = {
+            ...r,
+            after: fx.type === 'resume' ? 'resume' : (r.after ?? 'continue'),
+            navTo: fx.type === 'goto' ? fx.slideId : r.navTo,
+          };
+        }
         break;
       }
 
@@ -523,6 +559,14 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
           reportQuestions();
         }
         if (flushQueued()) break;
+        if (r.after === 'resume' && r.navTo) {
+          // Voice navigation ("next slide", "go back"): goto + resume = present from the new slide.
+          flushPending();
+          showSlide(r.navTo, 'agent');
+          s.resume = null;
+          emit({ kind: 'present', slideId: r.navTo, cue: 'navigated' });
+          break;
+        }
         if (r.after === 'resume') {
           const target = s.resume?.slideId ?? s.slideId;
           showSlide(target, 'auto');
@@ -536,6 +580,11 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
           break;
         }
         const hadAudio = (done.output ?? []).some((i) => i.content?.some((c) => c.type === 'output_audio'));
+        if (s.ending) {
+          // Goodbye generated: close now if silent, else when its audio finishes (onSilence).
+          if (!hadAudio && s.audioResponseId === null) cmds.push({ type: 'end_call' });
+          break;
+        }
         if (r.kind === 'present') {
           s.lastPresent = { responseId: done.id, slideId: r.slideId };
           // No audio will play, so no output_audio_buffer.stopped: advance now.
@@ -582,7 +631,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
           s.interruptAt = null;
         }
         if (s.audioResponseId === ev.response_id) s.audioResponseId = null;
-        if (s.pendingSlideId) showSlide(s.pendingSlideId, 'agent');
+        flushPending();
         if (s.agent === 'speaking') s.agent = 'interrupted';
         break;
 

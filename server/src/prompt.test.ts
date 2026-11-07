@@ -22,12 +22,15 @@ describe('buildInstructions', () => {
 
   it('carries the non-negotiable rules', () => {
     expect(prompt).toMatch(/call goto_slide FIRST/);
-    expect(prompt).toMatch(/Make all tool calls before you speak/);
+    expect(prompt).toMatch(/keep them to ONE turn before you speak/);
     expect(prompt).toMatch(/Never invent numbers/);
     expect(prompt).toMatch(/Background knowledge is approved content/);
     expect(prompt).toMatch(/never make a comparative claim/);
     expect(prompt).toMatch(/Flag it even when the deck itself addresses the question/);
     expect(prompt).toMatch(/Never announce navigation/);
+    expect(prompt).toMatch(/Navigation requests/);
+    expect(prompt).toMatch(/call end_call/);
+    expect(prompt).toMatch(/do not flag it/);
     expect(prompt).toMatch(/adverse_event/);
     expect(prompt).toMatch(/off_label/);
     expect(prompt).toContain(CUE_PREFIX);
@@ -75,7 +78,7 @@ describe('session config', () => {
   it('enables interrupting VAD and registers all tools', () => {
     const s = buildSessionConfig(deck, { model: 'gpt-realtime-2.1', voice: 'marin', vad: 'server' });
     expect(s.audio.input.turn_detection).toMatchObject({ type: 'server_vad', interrupt_response: true, create_response: true });
-    expect(s.tools.map((t) => t.name)).toEqual(['goto_slide', 'highlight', 'flag_for_followup', 'resume_presentation']);
+    expect(s.tools.map((t) => t.name)).toEqual(['goto_slide', 'highlight', 'flag_for_followup', 'resume_presentation', 'end_call']);
     expect(s).toHaveProperty('reasoning.effort', 'minimal');
   });
 

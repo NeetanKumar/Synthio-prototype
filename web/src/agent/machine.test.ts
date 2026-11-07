@@ -286,3 +286,41 @@ describe('connection drop', () => {
     expect(st.response?.id).toBe(PENDING);
   });
 });
+
+describe('voice navigation and ending', () => {
+  /** User interrupted slide 1 and a VAD response r2 is in flight. */
+  const answering = () => run([speech('u1'), done('r1', 'cancelled'), created('r2')], speakingS1().state).state;
+
+  it('"next slide" = goto + resume: presents the new slide and keeps auto-advancing from there', () => {
+    const st = run([tool('r2', 'goto_slide', { slide_id: 's2', reason: 'user asked' }), tool('r2', 'resume_presentation', {})], answering()).state;
+    const r = run([done('r2', 'completed', false)], st);
+    expect(r.state.slideId).toBe('s2');
+    expect(r.state.mode).toBe('presenting');
+    expect(cueText(r.commands)[0]).toContain('navigated to slide s2');
+    expect(r.state.questions).toEqual([]); // a navigation command is not a question
+    // and the deck continues to s3 afterwards
+    const r2 = run([created('r3', 'present', 's2'), started('r3'), done('r3'), stopped('r3')], r.state);
+    expect(r2.state.slideId).toBe('s3');
+  });
+
+  it('plain resume (no goto) still returns to the interrupted slide', () => {
+    const st = run([tool('r2', 'resume_presentation', {}), done('r2', 'completed', false)], answering()).state;
+    expect(st.slideId).toBe('s1');
+  });
+
+  it('goto with element_id points at the element', () => {
+    const st = run([tool('r2', 'goto_slide', { slide_id: 's3', reason: 'q', element_id: 's3-a' })], answering()).state;
+    expect(st).toMatchObject({ slideId: 's3', highlightId: 's3-a' });
+  });
+
+  it('end_call: lets the goodbye play, then closes; "ok" afterwards cannot restart the deck', () => {
+    let r = run([tool('r2', 'end_call', {}), done('r2', 'completed', false)], answering());
+    expect(r.state.ending).toBe(true);
+    expect(responseCreates(r.commands)).toEqual([{ kind: 'answer', slide_id: 's1' }]); // goodbye turn
+    r = run([created('r3'), started('r3'), done('r3')], r.state);
+    expect(r.commands.some((c) => c.type === 'end_call')).toBe(false); // still speaking
+    r = run([stopped('r3')], r.state);
+    expect(r.commands).toContainEqual({ type: 'end_call' });
+    expect(r.state.resume).toBeNull();
+  });
+});

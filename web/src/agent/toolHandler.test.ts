@@ -37,6 +37,28 @@ describe('goto_slide', () => {
   });
 });
 
+describe('goto_slide with element_id', () => {
+  it('navigates and points in one call', () => {
+    const r = handleToolCall(ctx, 'goto_slide', '{"slide_id":"efficacy","reason":"q","element_id":"easi75"}');
+    expect(r.effect).toEqual({ type: 'goto', slideId: 'efficacy', elementId: 'easi75' });
+  });
+  it('still navigates when the element is unknown, with a warning', () => {
+    const r = handleToolCall(ctx, 'goto_slide', '{"slide_id":"efficacy","reason":"q","element_id":"nope"}');
+    expect(r.effect).toEqual({ type: 'goto', slideId: 'efficacy' });
+    expect(r.output.element_warning).toBeDefined();
+  });
+  it('on the current slide it becomes a highlight', () => {
+    const r = handleToolCall({ slides, currentSlideId: 'efficacy' }, 'goto_slide', '{"slide_id":"efficacy","reason":"q","element_id":"easi75"}');
+    expect(r.effect).toEqual({ type: 'highlight', elementId: 'easi75' });
+  });
+});
+
+describe('end_call', () => {
+  it('ends', () => {
+    expect(handleToolCall(ctx, 'end_call', '{}').effect).toEqual({ type: 'end' });
+  });
+});
+
 describe('highlight', () => {
   it('accepts elements and sub-parts on the current slide', () => {
     const r = handleToolCall({ slides, currentSlideId: 'efficacy' }, 'highlight', '{"element_id":"easi75"}');

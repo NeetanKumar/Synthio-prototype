@@ -30,6 +30,13 @@ describe('eval scoring', () => {
     expect(scoreCase({ q: 'x', slide: null }, 's', [], '', false).factsOk).toBeNull();
   });
 
+  it('checks conversation-control tools', () => {
+    const c: EvalCase = { q: 'next slide', slide: 'b', tools: ['goto_slide', 'resume_presentation'] };
+    const ok = scoreCase(c, 'a', [{ name: 'goto_slide', args: { slide_id: 'b' } }, { name: 'resume_presentation', args: {} }], '', false);
+    expect(ok.toolsOk).toBe(true);
+    expect(scoreCase(c, 'a', [{ name: 'goto_slide', args: { slide_id: 'b' } }], '', false).toolsOk).toBe(false);
+  });
+
   it('summarizes accuracy and spurious flags', () => {
     const results = [
       scoreCase({ q: '1', slide: 'b' }, 'a', [{ name: 'goto_slide', args: { slide_id: 'b' } }], '', false),
@@ -42,6 +49,6 @@ describe('eval scoring', () => {
     const spec = JSON.parse(readFileSync(join(import.meta.dirname, 'questions.json'), 'utf8')) as { deck: string; cases: EvalCase[] };
     const ids = loadDecks().get(spec.deck)!.slides.map((s) => s.id);
     for (const c of spec.cases) if (c.slide) expect(ids).toContain(c.slide);
-    expect(spec.cases.length).toBeGreaterThanOrEqual(20);
+    expect(spec.cases.length).toBeGreaterThanOrEqual(25);
   });
 });

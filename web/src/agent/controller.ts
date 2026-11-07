@@ -101,6 +101,10 @@ export class AgentController {
       case 'log':
         console.warn('[agent]', c.message);
         break;
+      case 'end_call':
+        // Let the last audio frames drain, then close and show call notes.
+        setTimeout(() => void this.end(), 400);
+        break;
     }
   }
 

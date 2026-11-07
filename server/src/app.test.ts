@@ -18,7 +18,7 @@ function setup(over: { sessionsPerHour?: number; maxSessionMs?: number; failSumm
     complete: async () => {
       calls.complete += 1;
       if (over.failSummary) throw new Error('model down');
-      return 'The physician asked about efficacy.';
+      return JSON.stringify({ questions: [0], summary: 'The physician asked about efficacy.' });
     },
   };
   const appP = buildApp({
@@ -84,6 +84,7 @@ describe('telemetry and call notes', () => {
       { type: 'session', phase: 'start', at: 0 },
       { type: 'slide_change', from: 'unmet-need', to: 'efficacy', by: 'agent', at: 5000 },
       { type: 'question', text: 'What was EASI-75?', slideId: 'efficacy', via: 'voice', at: 6000 },
+      { type: 'question', text: 'Good to go.', slideId: 'efficacy', via: 'voice', at: 6500 },
       { type: 'flag', flag: 'adverse_event', summary: 'Patient had a rash', slideId: 'safety', at: 9000 },
       { type: 'interruption', via: 'voice', slideId: 'unmet-need', at: 4000 },
       { type: 'latency', metric: 'ttfa', ms: 700, at: 6500 },

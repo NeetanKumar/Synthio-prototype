@@ -5,7 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import { EventBatchSchema, toPublicDeck, type CallNotes, type Deck, type RealtimeSessionResponse } from '@msl/shared';
 import type { Store } from './db.ts';
-import { buildCallNotes, summaryPrompt } from './notes.ts';
+import { applySummary, buildCallNotes, summaryPrompt } from './notes.ts';
 import type { OpenAIClient } from './openai.ts';
 import { buildSessionConfig } from './sessionConfig.ts';
 
@@ -141,17 +141,18 @@ export async function buildApp(deps: AppDeps) {
       if (!deck) return reply.code(404).send({ error: 'deck not found' });
 
       const facts = buildCallNotes(session.id, deck, deps.store.getEvents(session.id));
-      let narrative = session.summary; // cached: one LLM call per session
-      if (!narrative) {
+      // Cached raw model output: one LLM call per session.
+      let raw = session.summary;
+      if (!raw) {
         try {
-          narrative = await deps.openai.complete(summaryPrompt(deck, facts));
-          deps.store.saveSummary(session.id, narrative);
+          raw = await deps.openai.complete(summaryPrompt(deck, facts));
+          deps.store.saveSummary(session.id, raw);
         } catch (err) {
           req.log.warn({ err }, 'summary generation failed');
-          narrative = null;
+          raw = null;
         }
       }
-      const notes: CallNotes = { ...facts, narrative };
+      const notes: CallNotes = raw ? applySummary(facts, raw) : { ...facts, narrative: null };
       return notes;
     },
   );

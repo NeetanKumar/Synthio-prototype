@@ -185,11 +185,11 @@ export function DevHud({ m, model, vad }: { m: MachineState; model: string | nul
         <span>Dev HUD</span>
         <span className="text-mist">press D</span>
       </div>
-      <dl className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+      <dl className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-1">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="text-mist">{k}</dt>
-            <dd className="truncate text-paper">{v}</dd>
+            <dd className="break-words text-paper">{v}</dd>
           </div>
         ))}
       </dl>

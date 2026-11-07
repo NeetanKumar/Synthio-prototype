@@ -5,10 +5,11 @@ import { highlightableIds, isToolName, TOOL_ARGS, type FlagType, type PublicSlid
 // No side effects here, so every edge case is unit-testable.
 
 export type ToolEffect =
-  | { type: 'goto'; slideId: string }
+  | { type: 'goto'; slideId: string; elementId?: string }
   | { type: 'highlight'; elementId: string }
   | { type: 'flag'; flag: z.infer<typeof FlagType>; summary: string }
   | { type: 'resume' }
+  | { type: 'end' }
   | { type: 'none' };
 
 export interface ToolResult {
@@ -47,9 +48,19 @@ export function handleToolCall(ctx: ToolContext, name: string, rawArgs: string):
       if (!slide) return fail(`no slide "${args.data.slide_id}"`, { valid_slide_ids: ctx.slides.map((s) => s.id) });
       if (slide.id === ctx.currentSlideId) {
         // Duplicate goto: idempotent, no re-animation.
+        const el = args.data.element_id;
+        if (el && highlightableIds(slide).includes(el)) {
+          return { output: { ok: true, slide_id: slide.id, title: slide.title, already_showing: true }, effect: { type: 'highlight', elementId: el } };
+        }
         return { output: { ok: true, slide_id: slide.id, title: slide.title, already_showing: true }, effect: { type: 'none' } };
       }
-      return { output: { ok: true, slide_id: slide.id, title: slide.title }, effect: { type: 'goto', slideId: slide.id } };
+      // An unknown element_id doesn't block navigation; it is just not pointed at.
+      const el = args.data.element_id;
+      const elementOk = el !== undefined && highlightableIds(slide).includes(el);
+      return {
+        output: { ok: true, slide_id: slide.id, title: slide.title, ...(el && !elementOk ? { element_warning: `no element "${el}" on that slide` } : {}) },
+        effect: { type: 'goto', slideId: slide.id, ...(elementOk ? { elementId: el } : {}) },
+      };
     }
 
     case 'highlight': {
@@ -80,5 +91,8 @@ export function handleToolCall(ctx: ToolContext, name: string, rawArgs: string):
 
     case 'resume_presentation':
       return { output: { ok: true }, effect: { type: 'resume' } };
+
+    case 'end_call':
+      return { output: { ok: true, note: 'Say one short goodbye sentence; the call closes when you finish.' }, effect: { type: 'end' } };
   }
 }

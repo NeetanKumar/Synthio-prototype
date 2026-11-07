@@ -154,7 +154,7 @@ _Measured on: (fill in after the first live run)_
 
 | Metric | Value | How |
 |---|---|---|
-| Time to first audio (p50) | _TBD_ | HUD: server end-of-speech → `output_audio_buffer.started`. Perceived delay ≈ value + 450 ms VAD silence window |
+| Time to first audio (p50) | v1 1,397 ms (n=13) · v2 _TBD_ | HUD: server end-of-speech → `output_audio_buffer.started`. Perceived delay ≈ value + 450 ms VAD silence window |
 | Interrupt → silence (local) | ~0 ms | audio element muted on `speech_started` |
 | Interrupt → silence (server-confirmed) | _TBD_ | `speech_started` → `output_audio_buffer.cleared` |
 | Eval routing accuracy | v1 94.7% (18/19) · v2 100% (19/19) · **v3 100% (57/57)** | `npm run eval`: 21 questions, same model + prompt + tools, text mode |
@@ -177,6 +177,18 @@ The eval also reports **spurious flags** and whether `goto_slide` came **before*
 
 ## Engineering notes
 
+- **Tools (5):**
+  - `goto_slide(slide_id, reason, element_id?)`: navigation and pointing in one call.
+  - `highlight`: points at an element on the current slide.
+  - `flag_for_followup`: logs a compliance item.
+  - `resume_presentation` and `end_call`: added beyond the brief, because the client can't reliably infer "carry on" or "let's stop" from a transcript.
+  - Voice navigation ("next slide", "skip to dosing") is `goto_slide` followed by `resume_presentation` in the same turn: the deck continues from the new slide.
+- **Latency lesson from a live test:** TTFA p50 was 1.4 s because answers made two tool round trips (goto, then highlight) before speaking. Each tool call ends the model's turn, and the client must answer before the model can talk. Now answers on the current slide make no tool call, and cross-slide answers make one (`goto_slide` with `element_id`).
+- **Lessons from a messy live test** (interjections, garbled speech-to-text, "skip", "let's end here"):
+  - Acknowledgements are never questions or flags.
+  - Garbled speech gets "could you repeat that?" instead of a guess.
+  - "End" closes the call and shows the notes.
+  - The call notes use the text model to keep only real questions (it selects from logged utterances and can't add any). The summary mentions pharmacovigilance only when an adverse event was actually flagged.
 - **Cost guard:**
   - 10 sessions per IP per hour.
   - Ephemeral keys live for 60 s.
