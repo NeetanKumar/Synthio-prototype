@@ -95,7 +95,7 @@ The eval caught real bugs: the agent said "no data" when the answer was in hidde
 - **Claims gate before speech.** Answers about efficacy and safety are spoken from pre-approved snippets, or passed through a claims checker, instead of free generation.
 
 **Product**
-- **Medical-affairs insights.** Aggregate questions across calls into themes, e.g. "38% of dermatologists ask about durability beyond week 16". That is a core MSL deliverable, and today it's done by hand.
+- **Medical-affairs insights.** Aggregate questions across calls into themes, e.g. what share of dermatologists ask about durability beyond week 16. That is a core MSL deliverable, and today it's done by hand.
 - **Personalised briefings.** Adapt depth and order to specialty and history from the CRM: an allergist hears more mechanism, a returning physician skips what they've seen. Call notes go back to the CRM (e.g. Veeva).
 - **Phone and human handoff.** Physicians call a number over SIP, which OpenAI Realtime supports. The agent transfers to a human MSL with context (`calls/{id}/refer`) when asked or when a flag needs a person.
 - **Patient mode.** The same engine with a lay-language deck, a reading-level check, stricter adverse-event capture, and explicit consent.
