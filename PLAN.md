@@ -1,6 +1,6 @@
 # PLAN — "Lumirexa" AI Medical Science Liaison
 
-> Status: implemented. See README.md and docs/ for the current design. Deploy: Fly (server) + Vercel (web).
+> Status: implemented. See README.md and docs/ for the current design.
 
 A voice agent presents a fictional topical drug to a physician. It routes questions to the right slide, can be interrupted mid-sentence, and flags compliance events.
 
@@ -178,7 +178,6 @@ The prompt stays server-side; the browser never sees it.
 3. **Reasoning-model latency.** Mitigation: `effort: minimal` and short `max_output_tokens`. If TTFA in the HUD is over about 1.2 s, fall back to `gpt-realtime-2.1-mini`.
 4. **The model talks before calling `goto_slide`.** Mitigation: a strong prompt rule, measured by the eval. If routing is weak, I'll add a client fallback that runs `goto` when the transcript names a slide.
 5. **Cursor estimate drift.** It is a heuristic, and the README will say so. The server-side truncation keeps the model's context correct regardless.
-6. **SQLite on Render's free tier resets on each deploy.** Fine for a demo; documented. A Fly volume is the alternative.
 7. **Toolchain pinning.** The latest TypeScript is 7.0 (the native port). I'll pin TS 5.9 for ecosystem stability: Vite, Vitest and type plugins are battle-tested on it. Everything else is on current versions: Vite 8, React 19, Tailwind 4, `motion` 14 (Framer Motion's current package name), Recharts 3, Fastify 5, zod 4, Vitest 5.
 
 ---
@@ -187,7 +186,7 @@ The prompt stays server-side; the browser never sees it.
 
 - **P0:** monorepo scaffold → deck schema + Lumirexa JSON → slide render → `/realtime/session` → WebRTC connect → autonomous presenting → `goto_slide` → interruption (local mute + server) → **demo**
 - **P1:** highlight → flags + toasts → cursor resume → bidirectional nav → captions → orb + mic meter → text fallback → **demo**
-- **P2:** Dev HUD → telemetry + call notes → eval → second deck → rate limit / hangup timer → deploy → README → **demo**
+- **P2:** Dev HUD → telemetry + call notes → eval → second deck → rate limit / hangup timer → README → **demo**
 
 ---
 
@@ -195,4 +194,3 @@ The prompt stays server-side; the browser never sees it.
 
 1. An OpenAI API key with realtime access, for your local `.env`. I never need to see it.
 2. OK on: **4 tools** (adding `resume_presentation`), **client-driven auto-advance**, and **eval via realtime text mode**.
-3. Render or Fly? I'd pick Fly if the SQLite data should survive redeploys.

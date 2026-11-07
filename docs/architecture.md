@@ -9,7 +9,7 @@ flowchart LR
     UI <--> C
     C <--> M
   end
-  subgraph Server["Server (Fastify, on Fly)"]
+  subgraph Server["Server (Fastify)"]
     S[/POST /api/realtime/session<br/>prompt + tools baked in/]
     T[/POST /api/sessions/:id/events/]
     N[/POST /api/sessions/:id/summary/]

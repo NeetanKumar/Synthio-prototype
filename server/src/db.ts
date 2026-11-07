@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { TelemetryEvent } from '@msl/shared';
 
-// node:sqlite is built into Node 22: no native module to compile on deploy.
+// node:sqlite is built into Node 22: no native module to compile.
 
 export interface SessionRow {
   id: string;

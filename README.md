@@ -9,7 +9,7 @@ A voice agent briefs a physician on **Lumirexa™ (tavrocitinib) cream 1%**, a f
 
 > **Fictional product. Synthetic data. Demo only.** Neither name matches a real drug.
 
-**Live:** `https://msl-live.vercel.app` _(placeholder)_ · **Loom:** _(placeholder)_ · **Docs:** [architecture](docs/architecture.md) · [eval](docs/eval.md) · [deploy](docs/deploy.md)
+**Loom:** _(placeholder)_ · **Docs:** [architecture](docs/architecture.md) · [eval](docs/eval.md)
 
 ## Run it
 

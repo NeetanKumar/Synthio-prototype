@@ -37,8 +37,9 @@ const HANGUP_GRACE_MS = 15_000;
 
 export async function buildApp(deps: AppDeps) {
   const now = deps.now ?? Date.now;
-  // trustProxy: behind Fly's proxy (and the Vercel rewrite) req.ip is the client from X-Forwarded-For.
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: true, bodyLimit: 256 * 1024 });
+  // Off by default: trusting X-Forwarded-For without a proxy in front lets clients spoof their IP
+  // and dodge the per-IP rate limit. Set TRUST_PROXY=true only behind a reverse proxy.
+  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: process.env.TRUST_PROXY === 'true', bodyLimit: 256 * 1024 });
   await app.register(cors, { origin: deps.webOrigin.split(',') });
   await app.register(rateLimit, { global: false });
 

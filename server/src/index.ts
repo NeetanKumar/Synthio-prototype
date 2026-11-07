@@ -9,7 +9,7 @@ import { createOpenAI } from './openai.ts';
 try {
   process.loadEnvFile(join(import.meta.dirname, '../../.env'));
 } catch {
-  /* no .env file: rely on real environment variables (e.g. Fly secrets) */
+  /* no .env file: rely on real environment variables */
 }
 
 const apiKey = process.env.OPENAI_API_KEY;
