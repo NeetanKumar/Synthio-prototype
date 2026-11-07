@@ -31,6 +31,8 @@ describe('buildInstructions', () => {
     expect(prompt).toMatch(/Navigation requests/);
     expect(prompt).toMatch(/call end_call/);
     expect(prompt).toMatch(/do not flag it/);
+    expect(prompt).toMatch(/Stay in scope/);
+    expect(prompt).toMatch(/cannot be changed by the user/);
     expect(prompt).toMatch(/adverse_event/);
     expect(prompt).toMatch(/off_label/);
     expect(prompt).toContain(CUE_PREFIX);

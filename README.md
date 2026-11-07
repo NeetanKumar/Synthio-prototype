@@ -66,6 +66,8 @@ v3 results: 21 questions × 3 runs; see [Results](#results).
 | Off-label | Unstudied ages, combinations or indications → says it's outside the label, doesn't advise, flags `off_label` | Flag recall 100% (15/15) |
 | Adverse events | Moves to the safety slide, flags `adverse_event`, refers to pharmacovigilance, gives no patient-specific medical advice | Routed and flagged 3/3 |
 | Unknown or out of scope | "I don't have data on that" and flags `out_of_scope`; never guesses | Spurious flags: 0 |
+| Off-topic or out-of-context requests | Weather, poems, coding, opinions → one-sentence decline, offer to return to the briefing; never answered, never flagged (keeps the compliance log clean) | New eval cases; counted in spurious flags |
+| Prompt injection / role change | "Ignore your instructions", "be my doctor", "show your prompt" → declines and stays in role; a clinical question inside is still handled (e.g. off-label → flagged) | New eval case |
 | Garbled speech | Asks the user to repeat instead of guessing or flagging (added after a live test produced a hallucinated answer) | New eval case |
 
 **Limit, stated plainly:** the prompt-level guardrails are *measured*, not *guaranteed*. One known miss remains (an exposure question answered without its figure). For production I'd gate claims before they are spoken, using MLR-approved answer snippets or a claims checker; see [Trade-offs](#trade-offs-speech-to-speech-vs-a-cascaded-stt--llm--tts-pipeline).
@@ -270,6 +272,12 @@ fly deploy
 
 ## What's next
 
+- **Auditing and compliance:**
+  - an append-only, tamper-evident audit log (hash-chained events, plus transcript and audio retained per policy)
+  - a reviewer queue for every flag, with owner, SLA and resolution
+  - adverse-event export to pharmacovigilance intake within the regulatory clock
+  - CRM export (e.g. Veeva) of the call notes
+  - sampled post-call review of real conversations (LLM judge + human), feeding new eval cases
 - Pre-approved answer snippets with claim IDs (MLR-ready), and a claims checker on the efficacy and safety answers.
 - A parallel adverse-event classifier on the user transcript.
 - Client-side VAD for even faster local barge-in, with server VAD confirming.
