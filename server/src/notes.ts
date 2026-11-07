@@ -1,12 +1,6 @@
 import { z } from 'zod';
-import type { CallNotes, Deck, TelemetryEvent } from '@msl/shared';
+import { median, type CallNotes, type Deck, type TelemetryEvent } from '@msl/shared';
 
-function p50(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m]! : Math.round((s[m - 1]! + s[m]!) / 2);
-}
 
 /**
  * Deterministic call notes from the event log. Every fact here is traceable to
@@ -52,7 +46,7 @@ export function buildCallNotes(sessionId: string, deck: Deck, events: TelemetryE
     flags,
     slidesVisited: visited,
     interruptions,
-    latency: { ttfaP50: p50(ttfa), interruptP50: p50(interrupt) },
+    latency: { ttfaP50: median(ttfa), interruptP50: median(interrupt) },
   };
 }
 

@@ -35,6 +35,16 @@ const SessionParams = z.object({ id: z.string().uuid() });
 const MAX_EVENTS_PER_SESSION = 3000;
 const HANGUP_GRACE_MS = 15_000;
 
+function parseCachedSummary(stored: string | null): { events: number; raw: string } | null {
+  if (!stored) return null;
+  try {
+    const v = JSON.parse(stored) as { events?: unknown; raw?: unknown };
+    return typeof v.events === 'number' && typeof v.raw === 'string' ? { events: v.events, raw: v.raw } : null;
+  } catch {
+    return null; // pre-versioned cache entry: regenerate
+  }
+}
+
 export async function buildApp(deps: AppDeps) {
   const now = deps.now ?? Date.now;
   // Off by default: trusting X-Forwarded-For without a proxy in front lets clients spoof their IP
@@ -141,19 +151,22 @@ export async function buildApp(deps: AppDeps) {
       const deck = deps.decks.get(session.deck_id);
       if (!deck) return reply.code(404).send({ error: 'deck not found' });
 
-      const facts = buildCallNotes(session.id, deck, deps.store.getEvents(session.id));
-      // Cached raw model output: one LLM call per session.
-      let raw = session.summary;
-      if (!raw) {
+      const events = deps.store.getEvents(session.id);
+      const facts = buildCallNotes(session.id, deck, events);
+      // Cache the model output keyed by the number of events it summarised: a later call with
+      // more events regenerates. Output that failed to parse is never cached.
+      const cached = parseCachedSummary(session.summary);
+      let notes: CallNotes | null = cached && cached.events === events.length ? applySummary(facts, cached.raw) : null;
+      if (!notes) {
         try {
-          raw = await deps.openai.complete(summaryPrompt(deck, facts));
-          deps.store.saveSummary(session.id, raw);
+          const raw = await deps.openai.complete(summaryPrompt(deck, facts));
+          notes = applySummary(facts, raw);
+          if (notes.narrative !== null) deps.store.saveSummary(session.id, JSON.stringify({ events: events.length, raw }));
         } catch (err) {
           req.log.warn({ err }, 'summary generation failed');
-          raw = null;
+          notes = { ...facts, narrative: null };
         }
       }
-      const notes: CallNotes = raw ? applySummary(facts, raw) : { ...facts, narrative: null };
       return notes;
     },
   );

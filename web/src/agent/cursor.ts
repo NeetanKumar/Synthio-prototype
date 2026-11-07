@@ -41,9 +41,4 @@ export function calibrate(rate: number, chars: number, durationMs: number): numb
   return rate * 0.7 + observed * 0.3;
 }
 
-export function median(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m]! : Math.round((s[m - 1]! + s[m]!) / 2);
-}
+export { median } from '@msl/shared';

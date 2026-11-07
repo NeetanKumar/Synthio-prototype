@@ -45,32 +45,40 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeCon
     dc.onerror = () => reject(new Error('data channel error'));
   });
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
+  // Any failure below must close the peer connection, or the mic stays attached to a
+  // half-open call (and the caller never gets a call id to report for server hang-up).
+  let callId: string | undefined;
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-  const res = await fetch(CALLS_URL, {
-    method: 'POST',
-    body: offer.sdp,
-    headers: { Authorization: `Bearer ${opts.clientSecret}`, 'Content-Type': 'application/sdp' },
-  });
-  if (!res.ok) {
+    const res = await fetch(CALLS_URL, {
+      method: 'POST',
+      body: offer.sdp,
+      headers: { Authorization: `Bearer ${opts.clientSecret}`, 'Content-Type': 'application/sdp' },
+    });
+    if (!res.ok) {
+      // Surface OpenAI's own reason (e.g. insufficient_quota vs rate_limit_exceeded on a 429).
+      const detail = await res
+        .json()
+        .then((b: { error?: { message?: string; code?: string } }) => b.error?.code ?? b.error?.message)
+        .catch(() => undefined);
+      const hint = detail === 'insufficient_quota' ? ' Add credit at platform.openai.com → Billing.' : '';
+      throw new Error(`OpenAI rejected the voice call (${res.status}${detail ? `: ${detail}` : ''}).${hint}`);
+    }
+    // Call id is the last path segment of Location; the server can hang up with it.
+    callId = res.headers.get('Location')?.split('/').pop();
+    await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
+
+    await Promise.race([
+      open,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('data channel timeout')), 10_000)),
+    ]);
+  } catch (err) {
+    dc.close();
     pc.close();
-    // Surface OpenAI's own reason (e.g. insufficient_quota vs rate_limit_exceeded on a 429).
-    const detail = await res
-      .json()
-      .then((b: { error?: { message?: string; code?: string } }) => b.error?.code ?? b.error?.message)
-      .catch(() => undefined);
-    const hint = detail === 'insufficient_quota' ? ' Add credit at platform.openai.com → Billing.' : '';
-    throw new Error(`OpenAI rejected the voice call (${res.status}${detail ? `: ${detail}` : ''}).${hint}`);
+    throw err;
   }
-  // Call id is the last path segment of Location; the server can hang up with it.
-  const callId = res.headers.get('Location')?.split('/').pop();
-  await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
-
-  await Promise.race([
-    open,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('data channel timeout')), 10_000)),
-  ]);
 
   return {
     callId,

@@ -22,6 +22,9 @@ export interface Snapshot {
 
 const RECONNECT_DELAYS = [500, 1500, 4000];
 
+/** A connect that finished after the user ended the call (or a newer attempt superseded it). */
+class Superseded extends Error {}
+
 export class AgentController {
   private snap: Snapshot;
   private listeners = new Set<() => void>();
@@ -34,6 +37,7 @@ export class AgentController {
   private t0 = 0;
   private textSeq = 0;
   private outbox: TelemetryEvent[] = [];
+  private flushing: Promise<void> | null = null;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private endTimer: ReturnType<typeof setTimeout> | null = null;
   private dropTimer: ReturnType<typeof setTimeout> | null = null;
@@ -122,6 +126,11 @@ export class AgentController {
     if (['starting', 'live', 'reconnecting'].includes(this.snap.phase)) return;
     this.t0 = performance.now();
     this.generation += 1;
+    const gen = this.generation;
+    // A new call is a new session: fresh log, fresh budget, no cached summary from the last one.
+    this.sessionId = null;
+    this.outbox = [];
+    this.audioEl.muted = false; // a Stop in the previous call may have left it muted
     this.patch({
       phase: 'starting',
       error: null,
@@ -145,7 +154,7 @@ export class AgentController {
     }
 
     try {
-      const session = await this.openSession();
+      const session = await this.openSession(gen);
       this.sessionId = session.sessionId;
       this.patch({ phase: 'live', model: session.model, deadline: performance.now() + session.maxSessionMs });
       this.endTimer = setTimeout(() => this.end('Session time limit reached. Showing call notes.'), session.maxSessionMs);
@@ -153,13 +162,14 @@ export class AgentController {
       this.outbox.push({ type: 'session', phase: 'start', at: 0 });
       this.dispatch({ type: 'connected' });
     } catch (err) {
+      if (err instanceof Superseded) return; // ended while connecting: end() already cleaned up
       this.releaseMedia();
       this.patch({ phase: 'failed', error: err instanceof Error ? err.message : 'Could not connect.' });
     }
   }
 
   /** Mint a key and open the WebRTC call. Reused by reconnect. */
-  private async openSession(): Promise<RealtimeSessionResponse> {
+  private async openSession(gen: number): Promise<RealtimeSessionResponse> {
     const res = await fetch('/api/realtime/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,9 +180,9 @@ export class AgentController {
       throw new Error(res.status === 429 ? 'Too many sessions from this network. Try again later.' : `Could not start the briefing: ${body.error ?? res.status}.`);
     }
     const session = (await res.json()) as RealtimeSessionResponse;
-    const gen = this.generation;
+    if (gen !== this.generation) throw new Superseded();
 
-    this.conn = await connectRealtime({
+    const conn = await connectRealtime({
       clientSecret: session.clientSecret,
       mic: this.mic,
       audioEl: this.audioEl,
@@ -192,6 +202,12 @@ export class AgentController {
         }
       },
     });
+    if (gen !== this.generation) {
+      // The user ended the call while we were connecting: don't let this one go live.
+      conn.close();
+      throw new Superseded();
+    }
+    this.conn = conn;
     // Lets the server enforce the session limit by hanging up the call itself.
     if (this.conn.callId) {
       void fetch(`/api/sessions/${session.sessionId}/call`, {
@@ -212,16 +228,18 @@ export class AgentController {
     this.conn = null;
     this.dispatch({ type: 'disconnected' });
     this.patch({ phase: 'reconnecting' });
+    const gen = this.generation;
 
     for (const delay of RECONNECT_DELAYS) {
       await new Promise((r) => setTimeout(r, delay));
       if (this.phase() !== 'reconnecting') return; // user ended meanwhile
       try {
-        await this.openSession();
+        await this.openSession(gen);
         this.patch({ phase: 'live', error: null });
         this.dispatch({ type: 'reconnected' });
         return;
-      } catch {
+      } catch (err) {
+        if (err instanceof Superseded) return; // ended during the attempt
         /* try again */
       }
     }
@@ -266,19 +284,36 @@ export class AgentController {
     this.audioCtx = null;
   }
 
+  /** Send queued telemetry in batches. Returns once the outbox is empty or the server is unreachable. */
   private async flush() {
-    if (!this.sessionId || this.outbox.length === 0) return;
-    const events = this.outbox.splice(0, 200);
-    try {
-      await fetch(`/api/sessions/${this.sessionId}/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events }),
-        keepalive: true, // survives tab close
-      });
-    } catch {
-      this.outbox.unshift(...events); // retry on next flush
-    }
+    if (this.flushing) return this.flushing;
+    this.flushing = (async () => {
+      while (this.sessionId && this.outbox.length > 0) {
+        const events = this.outbox.splice(0, 200);
+        let res: Response;
+        try {
+          res = await fetch(`/api/sessions/${this.sessionId}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ events }),
+            keepalive: true, // survives tab close
+          });
+        } catch {
+          this.outbox.unshift(...events); // offline: retry on the next flush
+          return;
+        }
+        if (res.ok) continue;
+        if (res.status >= 500 || res.status === 429) {
+          this.outbox.unshift(...events); // transient: retry later
+          return;
+        }
+        // 4xx (invalid batch, per-session cap): retrying can't succeed, so drop it and say so.
+        console.warn(`[agent] telemetry batch dropped (${res.status}): ${events.length} events`);
+      }
+    })().finally(() => {
+      this.flushing = null;
+    });
+    return this.flushing;
   }
 
   /** Tear down without call notes (component unmount). */

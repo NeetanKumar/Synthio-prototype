@@ -7,7 +7,7 @@ import type { OpenAIClient } from './openai.ts';
 
 process.env.LOG_LEVEL = 'silent';
 
-function setup(over: { sessionsPerHour?: number; maxSessionMs?: number; failSummary?: boolean } = {}) {
+function setup(over: { sessionsPerHour?: number; maxSessionMs?: number; failSummary?: boolean; badSummary?: boolean } = {}) {
   const calls = { mint: [] as object[], hangup: [] as string[], complete: 0 };
   const openai: OpenAIClient = {
     mintSecret: async (s) => {
@@ -18,6 +18,7 @@ function setup(over: { sessionsPerHour?: number; maxSessionMs?: number; failSumm
     complete: async () => {
       calls.complete += 1;
       if (over.failSummary) throw new Error('model down');
+      if (over.badSummary) return 'Sure! Here is your summary.';
       return JSON.stringify({ questions: [0], summary: 'The physician asked about efficacy.' });
     },
   };
@@ -103,6 +104,31 @@ describe('telemetry and call notes', () => {
     // Summary is cached: a second call costs no LLM call.
     await app.inject({ method: 'POST', url: `/api/sessions/${sessionId}/summary` });
     expect(calls.complete).toBe(1);
+  });
+
+  it('regenerates the summary when more events arrive, and never caches unparseable output', async () => {
+    const { appP, calls } = setup();
+    const app = await appP;
+    const { sessionId } = (await mint(app)).json<RealtimeSessionResponse>();
+    const post = (events: object[]) => app.inject({ method: 'POST', url: `/api/sessions/${sessionId}/events`, payload: { events } });
+    const summary = () => app.inject({ method: 'POST', url: `/api/sessions/${sessionId}/summary` });
+    await post([{ type: 'session', phase: 'start', at: 0 }]);
+    await summary();
+    await summary();
+    expect(calls.complete).toBe(1); // cached for the same events
+    await post([{ type: 'question', text: 'Dosing?', slideId: 'dosing', via: 'voice', at: 10 }]);
+    await summary();
+    expect(calls.complete).toBe(2); // new events: regenerated
+  });
+
+  it('does not cache a summary the model returned in the wrong format', async () => {
+    const { appP, calls } = setup({ badSummary: true });
+    const app = await appP;
+    const { sessionId } = (await mint(app)).json<RealtimeSessionResponse>();
+    const first = await app.inject({ method: 'POST', url: `/api/sessions/${sessionId}/summary` });
+    expect(first.json<CallNotes>().narrative).toBeNull();
+    await app.inject({ method: 'POST', url: `/api/sessions/${sessionId}/summary` });
+    expect(calls.complete).toBe(2); // retried, not cached
   });
 
   it('rejects malformed events and unknown sessions', async () => {

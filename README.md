@@ -22,7 +22,7 @@ Open http://localhost:5173, click **Start briefing**, and use headphones.
 - **Speak** to interrupt, ask a question, or say "next slide" / "let's end here".
 - **`Space`** stops the agent; **`←` `→`** navigate; **`D`** opens the latency HUD.
 - **`?deck=voice-latency`** loads a second deck: swapping the JSON swaps the topic.
-- **Checks:** `npm test` (76 tests) · `npm run typecheck` · `npm run eval`
+- **Checks:** `npm test` (85 tests) · `npm run typecheck` · `npm run eval`
 
 ## Stack
 

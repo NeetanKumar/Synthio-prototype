@@ -1,6 +1,7 @@
 export * from './deck.ts';
 export * from './tools.ts';
 export * from './telemetry.ts';
+export * from './stats.ts';
 
 /** Marks app-generated "director" messages (slide cues) in the conversation. */
 export const CUE_PREFIX = '[cue]';

@@ -184,10 +184,25 @@ describe('errors', () => {
     expect(commands).toEqual([]);
   });
 
-  it('retries our response when it lost a race with a VAD response', () => {
-    const st = run([{ type: 'connected' }, srv({ type: 'error', error: { type: 'invalid_request_error', code: 'conversation_already_has_active_response', message: 'x' } })]).state;
+  it('retries a lost response.create once, without resending the cue (error before VAD response.created)', () => {
+    const lost = srv({ type: 'error', error: { type: 'invalid_request_error', code: 'conversation_already_has_active_response', message: 'x' } });
+    const st = run([{ type: 'connected' }, lost]).state;
     expect(st.response).toBeNull();
-    expect(st.queued).toMatchObject({ kind: 'present', slideId: 's1' });
+    expect(st.queued).toEqual({ kind: 'continue', as: 'present', slideId: 's1' });
+    const r = run([{ type: 'server', event: { type: 'response.done', response: { id: 'vad', status: 'completed' } } }], st);
+    expect(sent(r.commands)).toEqual(['response.create']); // no second cue item
+  });
+
+  it('also retries when the VAD response.created arrives before the error', () => {
+    const lost = srv({ type: 'error', error: { type: 'invalid_request_error', code: 'conversation_already_has_active_response', message: 'x' } });
+    const st = run([{ type: 'connected' }, created('vad'), lost]).state; // VAD response is active, not PENDING
+    expect(st.queued).toEqual({ kind: 'continue', as: 'present', slideId: 's1' });
+  });
+
+  it('drops a lost scripted step if the user has taken over', () => {
+    const lost = srv({ type: 'error', error: { type: 'invalid_request_error', code: 'conversation_already_has_active_response', message: 'x' } });
+    const st = run([{ type: 'connected' }, speech('u1'), lost]).state;
+    expect(st.queued).toBeNull();
   });
 });
 
@@ -339,5 +354,31 @@ describe('voice navigation and ending', () => {
     r = run([stopped('r3')], r.state);
     expect(r.commands).toContainEqual({ type: 'end_call' });
     expect(r.state.resume).toBeNull();
+  });
+});
+
+describe('review fixes', () => {
+  it('reconnect unmutes the audio element, not just the state', () => {
+    const st = run([{ type: 'user_stop' }], speakingS1().state).state; // muted by Stop
+    expect(st.muted).toBe(true);
+    const r = run([{ type: 'disconnected' }, { type: 'reconnected' }], st);
+    expect(r.commands).toContainEqual({ type: 'unmute' });
+    expect(r.state.muted).toBe(false);
+  });
+
+  it('a highlight for a slide still waiting behind audio appears with that slide', () => {
+    const st = run([created('r1'), started('r1'), done('r1'), created('r2')], run([{ type: 'connected' }]).state).state;
+    const a = run([tool('r2', 'goto_slide', { slide_id: 's2', reason: 'q' }), tool('r2', 'highlight', { element_id: 's2-a' })], st);
+    expect(a.state.slideId).toBe('s1');
+    expect(a.state.highlightId).toBeNull();
+    const b = run([stopped('r1')], a.state);
+    expect(b.state).toMatchObject({ slideId: 's2', highlightId: 's2-a' });
+  });
+
+  it('Resume pressed while the cancelled response is still finishing is queued, not ignored', () => {
+    const st = run([{ type: 'user_stop' }, { type: 'user_resume' }], speakingS1().state).state;
+    expect(st.queued).toMatchObject({ kind: 'present', cue: 'resume' });
+    const r = run([done('r1', 'cancelled')], st);
+    expect(responseCreates(r.commands)).toEqual([{ kind: 'present', slide_id: 's1' }]);
   });
 });

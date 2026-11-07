@@ -96,6 +96,8 @@ export interface MachineState {
   /** A response we want once the current one ends. Latest wins. */
   queued: Request | null;
   lastRequest: Request | null;
+  /** Our last response.create, until a response carrying our metadata confirms it. */
+  unconfirmed: Request | null;
   /** User hit Stop before response.created arrived: cancel it on arrival. */
   cancelOnCreate: boolean;
   /** Response whose audio is playing, or null when silent. */
@@ -153,6 +155,7 @@ export function initialState(slides: PublicSlide[]): MachineState {
     response: null,
     queued: null,
     lastRequest: null,
+    unconfirmed: null,
     cancelOnCreate: false,
     audioResponseId: null,
     audioStartAt: {},
@@ -226,6 +229,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
   /** Actually send a response request. Caller guarantees nothing is in flight. */
   const emit = (req: Request) => {
     s.lastRequest = req;
+    s.unconfirmed = req;
     const kind: Kind = req.kind === 'continue' ? req.as : req.kind;
     s.response = { id: PENDING, kind, slideId: req.slideId, after: null };
     if (s.agent !== 'listening') s.agent = 'thinking';
@@ -348,7 +352,9 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
       // The new session has no memory: re-seed it with a compact recap.
       track({ type: 'session', phase: 'reconnect' });
       s.agent = 'idle';
+      // State and the audio element must agree: a Stop just before the drop left it muted.
       s.muted = false;
+      cmds.push({ type: 'unmute' });
       const asked = s.questions.filter((q) => q.text).map((q) => `"${q.text}"`).slice(-4);
       const target = s.resume?.slideId ?? s.slideId;
       const recap = `Slides covered so far: ${s.visited.join(', ')}. ${asked.length ? `Questions asked so far: ${asked.join('; ')}.` : 'No questions yet.'}`;
@@ -381,7 +387,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
       break;
 
     case 'user_resume': {
-      if (s.response) break;
+      // If a (cancelled) response is still finishing, request() queues this behind it.
       const target = s.resume?.slideId ?? s.slideId;
       showSlide(target, 'user');
       s.resume = null;
@@ -473,6 +479,7 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
         const md = ev.response.metadata ?? {};
         const kind: Kind = md.kind === 'present' ? 'present' : 'answer';
         // Ours (metadata echoed back) or one the server VAD created from speech.
+        if (md.kind) s.unconfirmed = null;
         s.response = { id: ev.response.id, kind, slideId: md.slide_id ?? s.slideId, after: null };
         s.metrics.responses += 1;
         if (kind === 'present' && s.narration?.slideId === s.response.slideId) {
@@ -514,7 +521,9 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
             if (fx.elementId) s.highlightId = fx.elementId;
           }
         } else if (fx.type === 'highlight') {
-          s.highlightId = fx.elementId;
+          // The element belongs to the pending slide if one is queued: show it with that slide.
+          if (s.pendingSlideId) s.pendingHighlightId = fx.elementId;
+          else s.highlightId = fx.elementId;
         } else if (fx.type === 'flag') {
           const slideId = s.pendingSlideId ?? s.slideId;
           s.flags = [...s.flags, { id: ev.call_id, type: fx.flag, summary: fx.summary, slideId }];
@@ -644,10 +653,19 @@ export function reduce(prev: MachineState, input: Input, now = 0): { state: Mach
       case 'error': {
         const code = ev.error.code ?? '';
         if (BENIGN_ERRORS.has(code)) break;
-        if (s.response?.id === PENDING && code === 'conversation_already_has_active_response') {
-          // Our create lost a race with a VAD response; retry when it finishes.
-          s.response = null;
-          s.queued = s.lastRequest;
+        if (code === 'conversation_already_has_active_response' && s.unconfirmed) {
+          // Our response.create lost a race with a server (VAD) response. It may arrive before or
+          // after that response's response.created, so key off `unconfirmed`, not PENDING.
+          const lost = s.unconfirmed;
+          s.unconfirmed = null;
+          if (s.response?.id === PENDING) s.response = null;
+          // Retry with response.create only: any cue item is already in the conversation.
+          // Drop a scripted step if the user has since taken over (the VAD response is theirs).
+          const stillWanted = lost.kind !== 'present' || s.mode === 'presenting';
+          if (stillWanted && !s.queued) {
+            const kind = lost.kind === 'continue' ? lost.as : lost.kind;
+            s.queued = { kind: 'continue', as: kind, slideId: lost.slideId };
+          }
         }
         cmds.push({ type: 'log', message: `${ev.error.type}${code ? `/${code}` : ''}: ${ev.error.message}` });
         break;
