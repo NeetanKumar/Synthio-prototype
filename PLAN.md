@@ -1,6 +1,6 @@
 # PLAN — "Lumirexa" AI Medical Science Liaison
 
-> Status: P0, P1 and P2 are implemented. See README.md for the current design. Deploy: Fly (server) + Vercel (web).
+> Status: implemented. See README.md and docs/ for the current design. Deploy: Fly (server) + Vercel (web).
 
 A voice agent presents a fictional topical drug to a physician. It routes questions to the right slide, can be interrupted mid-sentence, and flags compliance events.
 
