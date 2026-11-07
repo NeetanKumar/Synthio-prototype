@@ -1,0 +1,82 @@
+{
+  "id": "voice-latency",
+  "title": "Why voice agents feel slow",
+  "subtitle": "A 4-slide primer on latency in conversational voice AI",
+  "persona": "Sam, a friendly solutions engineer",
+  "audience": "a product manager evaluating voice AI vendors",
+  "footer": "Demo deck. Illustrative numbers, not benchmarks.",
+  "slides": [
+    {
+      "id": "why-latency",
+      "kicker": "01 · The problem",
+      "title": "Humans notice gaps longer than about half a second",
+      "elements": [
+        { "kind": "stat", "id": "gap-stat", "value": "~200 ms", "label": "typical gap between turns in human conversation" },
+        { "kind": "bullet", "id": "gap-awkward", "text": "Longer gaps read as hesitation or a dropped call" },
+        { "kind": "bullet", "id": "gap-talkover", "text": "Slow agents get talked over, which compounds the problem" },
+        { "kind": "bullet", "id": "gap-trust", "text": "In healthcare, hesitation erodes trust fast" }
+      ],
+      "speakerNotes": "Explain that conversation has a natural rhythm with very short gaps, and that anything much longer than half a second feels off. Slow agents get interrupted, which makes things worse.",
+      "knowledge": [
+        "Cross-language studies of turn-taking put the modal gap at roughly 200 ms (illustrative figure for this demo).",
+        "Users tolerate longer gaps when the agent signals it is thinking, e.g. a short acknowledgement."
+      ]
+    },
+    {
+      "id": "pipeline",
+      "kicker": "02 · Two architectures",
+      "title": "Cascaded pipeline vs. speech-to-speech",
+      "elements": [
+        { "kind": "flow", "id": "pipeline-flow", "steps": [
+          { "id": "step-vad", "label": "VAD", "caption": "Detect end of speech" },
+          { "id": "step-stt", "label": "STT", "caption": "Transcribe audio to text" },
+          { "id": "step-llm", "label": "LLM", "caption": "Decide what to say" },
+          { "id": "step-tts", "label": "TTS", "caption": "Synthesise the reply" }
+        ] },
+        { "kind": "bullet", "id": "pipe-cascade", "text": "Cascaded: every hop adds latency, but each stage is swappable and inspectable" },
+        { "kind": "bullet", "id": "pipe-s2s", "text": "Speech-to-speech: one model hears and speaks, skipping the STT and TTS hops" }
+      ],
+      "speakerNotes": "Walk through the four stages of a cascaded pipeline, then contrast with a speech-to-speech model that collapses transcription, reasoning and synthesis into one step.",
+      "knowledge": [
+        "Speech-to-speech models also handle barge-in natively because they own the audio stream.",
+        "Cascaded pipelines make it easier to apply text-level guardrails before anything is spoken."
+      ]
+    },
+    {
+      "id": "budget",
+      "kicker": "03 · Latency budget",
+      "title": "Where the milliseconds go",
+      "elements": [
+        { "kind": "chart", "id": "budget-chart", "title": "Typical time per stage (ms)", "unit": "ms", "arms": ["Cascaded", "Speech-to-speech"], "groups": [
+          { "id": "budget-vad", "label": "End-of-speech", "values": [450, 450] },
+          { "id": "budget-model", "label": "Model first token", "values": [700, 350] },
+          { "id": "budget-tts", "label": "First audio out", "values": [300, 80] }
+        ], "footnote": "Illustrative values for discussion only." },
+        { "kind": "bullet", "id": "budget-vad-note", "text": "End-of-speech detection is a fixed cost in both designs" }
+      ],
+      "speakerNotes": "Point out that end-of-speech detection costs the same in both designs, while the model and synthesis stages are where speech-to-speech saves most of its time.",
+      "knowledge": [
+        "Semantic VAD can shorten the end-of-speech wait when the user clearly finished a sentence.",
+        "Network round trips add 50-150 ms per hop depending on region (illustrative)."
+      ]
+    },
+    {
+      "id": "takeaways",
+      "kicker": "04 · Takeaways",
+      "title": "How to make an agent feel instant",
+      "elements": [
+        { "kind": "table", "id": "tips-table", "columns": ["Lever", "Effect"], "rows": [
+          { "id": "tip-stream", "cells": ["Stream audio over WebRTC", "No buffering of whole replies"] },
+          { "id": "tip-local-mute", "cells": ["Mute locally on barge-in", "Silence without a network round trip"] },
+          { "id": "tip-short", "cells": ["Short first sentence", "Earlier first audio"] },
+          { "id": "tip-region", "cells": ["Serve close to users", "Fewer ms per hop"] }
+        ] },
+        { "kind": "bullet", "id": "tips-measure", "text": "Measure it: time-to-first-audio and interrupt-to-silence" }
+      ],
+      "speakerNotes": "Summarise the practical levers and close by stressing that you can only improve what you measure. Invite questions.",
+      "knowledge": [
+        "This demo app shows both metrics live in its Dev HUD (press D)."
+      ]
+    }
+  ]
+}

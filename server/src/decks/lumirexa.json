@@ -1,0 +1,142 @@
+{
+  "id": "lumirexa",
+  "title": "Lumirexa™ (tavrocitinib) cream 1%",
+  "subtitle": "Topical JAK1-selective inhibitor for moderate-to-severe atopic dermatitis",
+  "persona": "Dr. Ava Lin, a medical science liaison for the (fictional) company Halcyon Dermatology",
+  "audience": "a practising dermatologist or allergist",
+  "footer": "Fictional product. Synthetic data. Demo only.",
+  "slides": [
+    {
+      "id": "unmet-need",
+      "kicker": "01 · The problem",
+      "title": "Many patients stay uncontrolled on topical steroids",
+      "elements": [
+        { "kind": "stat", "id": "need-stat-uncontrolled", "value": "~40%", "label": "of moderate-to-severe patients report inadequate control on topical corticosteroids" },
+        { "kind": "bullet", "id": "need-itch", "text": "Itch drives sleep loss and is the symptom patients rank worst" },
+        { "kind": "bullet", "id": "need-steroid-limits", "text": "Steroid-sparing sites (face, folds) limit long-term options" },
+        { "kind": "bullet", "id": "need-gap", "text": "Gap: a non-steroidal topical with systemic-class efficacy" }
+      ],
+      "speakerNotes": "Open warmly and briefly introduce yourself. Frame the gap: a large share of moderate-to-severe patients are not controlled on topical steroids, itch is the symptom that hurts quality of life most, and sensitive sites limit steroid use. Tee up that Lumirexa is designed for exactly that gap.",
+      "knowledge": [
+        "The ~40% figure comes from the fictional ATLAS-AD physician survey (n=1,210 patients, 2025).",
+        "Sensitive sites named in the survey: face, neck, intertriginous areas, genitals.",
+        "Average patient in the survey had tried 2.3 topical regimens before referral.",
+        "Lumirexa is not positioned to replace biologics; it is positioned before or alongside systemic decision-making."
+      ]
+    },
+    {
+      "id": "mechanism",
+      "kicker": "02 · Mechanism of action",
+      "title": "Blocking JAK1 signalling at the skin",
+      "elements": [
+        { "kind": "flow", "id": "moa-flow", "steps": [
+          { "id": "moa-cytokines", "label": "IL-4 · IL-13 · IL-31", "caption": "Type 2 cytokines bind receptors on skin and nerve cells" },
+          { "id": "moa-jak1", "label": "JAK1", "caption": "Receptor-associated kinase is activated", "blockedBy": "tavrocitinib" },
+          { "id": "moa-stat", "label": "STAT", "caption": "Signal reaches the nucleus" },
+          { "id": "moa-response", "label": "Itch · inflammation", "caption": "Barrier damage and itch signalling" }
+        ] },
+        { "kind": "bullet", "id": "moa-selectivity", "text": "Tavrocitinib is JAK1-selective, applied locally where disease is" },
+        { "kind": "bullet", "id": "moa-exposure", "text": "Low systemic exposure at labelled doses" }
+      ],
+      "speakerNotes": "Explain simply: type 2 cytokines like IL-4, IL-13 and IL-31 signal through JAK1; tavrocitinib blocks JAK1 in the skin, which interrupts both inflammation and itch signalling. Mention selectivity and that it is applied locally, keeping systemic exposure low.",
+      "knowledge": [
+        "Selectivity: approximately 38-fold for JAK1 over JAK2 in cellular assays (synthetic data).",
+        "Mean steady-state plasma concentration at 20% BSA twice daily was below 5% of the JAK1 cellular IC50.",
+        "IL-31 is a key pruritogenic cytokine; JAK1 blockade on sensory neurons is the proposed reason itch improves early.",
+        "Tavrocitinib is a small molecule; it is not a biologic and does not require injection.",
+        "Vehicle is a non-greasy oil-in-water cream."
+      ]
+    },
+    {
+      "id": "efficacy",
+      "kicker": "03 · Phase 3 efficacy",
+      "title": "LUMEN-1 & LUMEN-2: pooled week 16 results",
+      "elements": [
+        { "kind": "chart", "id": "efficacy-chart", "title": "Responders at week 16 (%)", "unit": "%", "arms": ["Lumirexa 1% BID", "Vehicle"], "groups": [
+          { "id": "efficacy-easi75", "label": "EASI-75", "values": [51.8, 17.2] },
+          { "id": "efficacy-iga", "label": "IGA 0/1", "values": [44.6, 12.9] },
+          { "id": "efficacy-itch", "label": "Itch NRS ≥4-pt", "values": [49.3, 19.8] },
+          { "id": "efficacy-easi90", "label": "EASI-90", "values": [31.0, 8.1] }
+        ], "footnote": "Pooled ITT, N=1,248 (2:1 randomisation). All comparisons p<0.001. Synthetic data." },
+        { "kind": "bullet", "id": "efficacy-itch-onset", "text": "Itch relief separated from vehicle by day 3" }
+      ],
+      "speakerNotes": "Headline the primary endpoint: about half of patients reached EASI-75 at week 16 versus about one in six on vehicle. Point out IGA success and itch response tell the same story, and that itch relief appeared within days. Use the numbers on the slide only.",
+      "knowledge": [
+        "LUMEN-1 and LUMEN-2 were identical 16-week, randomised, double-blind, vehicle-controlled trials.",
+        "Population: age 12 and over, IGA 3 or 4, body surface area 3% to 20%, EASI 16 or higher at baseline.",
+        "Pooled N=1,248; 832 Lumirexa, 416 vehicle.",
+        "Primary endpoint was EASI-75 at week 16. Key secondaries: IGA treatment success (0/1 with ≥2-grade improvement), ≥4-point itch NRS improvement, EASI-90.",
+        "Mean baseline EASI was 21.4; mean baseline BSA was 11.2%.",
+        "Itch NRS separation from vehicle was statistically significant from day 3 (p<0.01).",
+        "A 36-week open-label extension (LUMEN-LTE) showed EASI-75 maintained in 71% of week-16 responders.",
+        "Adolescents (12-17) were 22% of the population; their EASI-75 rate was 53.1%, consistent with adults.",
+        "There is no head-to-head trial versus dupilumab, other biologics, or other topical JAK inhibitors."
+      ]
+    },
+    {
+      "id": "safety",
+      "kicker": "04 · Safety & tolerability",
+      "title": "Adverse events through week 16",
+      "elements": [
+        { "kind": "table", "id": "safety-table", "columns": ["Adverse event", "Lumirexa (n=832)", "Vehicle (n=416)"], "rows": [
+          { "id": "ae-nasopharyngitis", "cells": ["Nasopharyngitis", "4.0%", "3.5%"] },
+          { "id": "ae-application-site", "cells": ["Application-site pain", "3.1%", "2.4%"] },
+          { "id": "ae-headache", "cells": ["Headache", "2.2%", "2.0%"] },
+          { "id": "ae-folliculitis", "cells": ["Folliculitis", "1.8%", "0.7%"] },
+          { "id": "ae-acne", "cells": ["Acne", "1.5%", "0.9%"] },
+          { "id": "ae-serious", "cells": ["Serious AEs", "0.6%", "0.8%"] },
+          { "id": "ae-discontinuation", "cells": ["Discontinued due to AE", "1.2%", "2.1%"] }
+        ], "footnote": "AEs ≥1.5% in the Lumirexa arm plus serious AEs and discontinuations. Synthetic data." },
+        { "kind": "bullet", "id": "safety-class", "text": "Label carries JAK inhibitor class warnings" }
+      ],
+      "speakerNotes": "Summarise tolerability: adverse event rates were low and close to vehicle; the most common were nasopharyngitis and application-site pain. Folliculitis and acne were slightly more frequent than vehicle. Discontinuations were actually lower than vehicle. Note the label carries JAK class warnings.",
+      "knowledge": [
+        "No deaths, malignancies, major adverse cardiovascular events or thromboses occurred in either arm through week 16.",
+        "No clinically meaningful changes were seen in haemoglobin, neutrophils, platelets or lipids.",
+        "Application-site reactions were mostly mild and resolved without stopping treatment.",
+        "Class warnings on the label (as for all JAK inhibitors): serious infections, mortality, malignancy, MACE and thrombosis, based on oral JAK inhibitor data.",
+        "Herpes zoster: 0.2% Lumirexa vs 0.0% vehicle.",
+        "Adverse events in patients should be reported to Halcyon Pharmacovigilance or the national reporting system."
+      ]
+    },
+    {
+      "id": "dosing",
+      "kicker": "05 · Dosing & administration",
+      "title": "Thin layer, twice daily, up to 20% BSA",
+      "elements": [
+        { "kind": "bullet", "id": "dosing-bid", "text": "Apply a thin layer twice daily to affected skin" },
+        { "kind": "bullet", "id": "dosing-bsa", "text": "Up to 20% body surface area" },
+        { "kind": "bullet", "id": "dosing-max", "text": "No more than 60 g per week" },
+        { "kind": "bullet", "id": "dosing-stop", "text": "Stop when cleared; restart at signs of flare" },
+        { "kind": "bullet", "id": "dosing-reassess", "text": "Reassess if no improvement after 8 weeks" }
+      ],
+      "speakerNotes": "Keep it practical: thin layer twice a day, up to a fifth of body surface, a weekly ceiling of 60 grams. Patients stop when clear and restart on flare. If there's no improvement by eight weeks, reassess.",
+      "knowledge": [
+        "Do not use under occlusive dressings.",
+        "Avoid eyes, mouth and mucous membranes.",
+        "Use on the face and skin folds was permitted in LUMEN trials.",
+        "Supplied in 30 g and 60 g tubes.",
+        "No dose adjustment was studied for hepatic or renal impairment; use is not recommended in severe hepatic impairment.",
+        "Moisturisers can be used; apply Lumirexa first and wait 15 minutes."
+      ]
+    },
+    {
+      "id": "summary",
+      "kicker": "06 · Who it is for",
+      "title": "Patient selection & summary",
+      "elements": [
+        { "kind": "bullet", "id": "select-who", "text": "Age 12+, moderate-to-severe AD not adequately controlled with topical prescription therapy" },
+        { "kind": "bullet", "id": "select-not", "text": "Not for use with biologics, other JAK inhibitors or potent immunosuppressants" },
+        { "kind": "bullet", "id": "select-sites", "text": "Option for sensitive sites where steroid use is limited" },
+        { "kind": "stat", "id": "summary-easi75", "value": "51.8%", "label": "EASI-75 at week 16 vs 17.2% vehicle" }
+      ],
+      "speakerNotes": "Describe the right patient: 12 and older, moderate-to-severe disease, not controlled on topical prescription therapy, especially with sensitive-site involvement. Remind them it is not for combination with biologics or other JAK inhibitors. Close with the headline result and invite questions.",
+      "knowledge": [
+        "Not studied in children under 12, in pregnancy, or in immunocompromised patients.",
+        "Combination with dupilumab, tralokinumab or other systemic therapy was not studied and is not recommended.",
+        "Vitiligo, hand eczema and psoriasis are not approved indications.",
+        "Patient support programme: Halcyon Connect offers co-pay support and nurse education (fictional)."
+      ]
+    }
+  ]
+}
