@@ -157,15 +157,19 @@ _Measured on: (fill in after the first live run)_
 | Time to first audio (p50) | _TBD_ | HUD: server end-of-speech → `output_audio_buffer.started`. Perceived delay ≈ value + 450 ms VAD silence window |
 | Interrupt → silence (local) | ~0 ms | audio element muted on `speech_started` |
 | Interrupt → silence (server-confirmed) | _TBD_ | `speech_started` → `output_audio_buffer.cleared` |
-| Eval routing accuracy | v1 94.7% (18/19) · v2 100% (19/19) · v3 _TBD_ | `npm run eval`: 21 questions, same model + prompt + tools, text mode |
-| Eval flag recall | v1 80% (4/5) · v2 80% (4/5) · v3 _TBD_ | off-label, adverse-event, out-of-scope cases |
-| Eval fact accuracy | v1 85% (17/20) · v2 95% (19/20) · v3 _TBD_ |
-| Navigate before speaking | v1 100% · v2 95.2% · v3 _TBD_ | `goto_slide` called before any spoken text |
-| Spurious flags | v1 1 · v2 0 · v3 _TBD_ | flags raised on questions that needed none | answer must contain the deck's figure (number words allowed) |
+| Eval routing accuracy | v1 94.7% (18/19) · v2 100% (19/19) · **v3 100% (57/57)** | `npm run eval`: 21 questions, same model + prompt + tools, text mode |
+| Eval flag recall | v1 80% (4/5) · v2 80% (4/5) · **v3 100% (15/15)** | off-label, adverse-event, out-of-scope cases |
+| Eval fact accuracy | v1 85% (17/20) · v2 95% (19/20) · **v3 95% (57/60)** |
+| Navigate before speaking | v1 100% · v2 95.2% · **v3 100%** | `goto_slide` called before any spoken text |
+| Spurious flags | v1 1 · v2 0 · **v3 0** | flags raised on questions that needed none | answer must contain the deck's figure (number words allowed) |
 
 **What the eval caught.** v1 (`gpt-realtime-2.1`) routed well and always navigated before speaking. But on three questions it said *"I don't have that data"* when the answer was in the slide's hidden `knowledge`: durability (71% maintained), JAK1 selectivity (~38-fold), and systemic exposure (<5% of IC50). It treated "not on screen" as "not in the deck". It also didn't move to the safety slide for an adverse-event report, and didn't flag a competitor-comparison question. v2 changes the prompt to say background knowledge is approved content to use, adds explicit rules for comparisons and adverse events, and adds fact checks to the eval so this class of miss is scored.
 
 v2 fixed those, but a single run showed three new misses: an off-label question went unflagged because the deck already said "not recommended"; one answer gave "low" instead of the <5% figure; and the agent once said "let me pull up the slide" before navigating. v3 tightens those three rules. Each case runs once by default and the model samples, so a single flip can be noise. `npm run eval -- --repeat 3` measures consistency.
+
+**v3** (`gpt-realtime-2.1`, 21 questions × 3 runs, 2026-11-07): 100% routing, 100% flag recall, no spurious flags, and every navigation happened before speech. **The one consistent miss:** asked *"Should I worry about systemic exposure?"*, the agent says exposure is "low" but doesn't cite the <5%-of-IC50 figure (0 of 3 runs). I left it unpatched instead of tuning the prompt to this one question; in production this is a case for pre-approved answer snippets.
+
+*Measurement note:* an earlier 3× run looked like a regression (61% routing). It was the account's 200k tokens-per-minute realtime limit: 42 of 63 responses were throttled and scored as empty answers. The runner now counts failed responses as errors with their reason, and defaults to low concurrency. Use `--concurrency 1` on new accounts.
 
 The eval also reports **spurious flags** and whether `goto_slide` came **before** any speech, as the prompt requires. Results are written to `server/src/eval/results.json`.
 
