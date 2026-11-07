@@ -26,7 +26,7 @@ const arg = (name: string) => {
   return i > 0 ? process.argv[i + 1] : undefined;
 };
 const MODEL = arg('model') ?? process.env.REALTIME_MODEL ?? 'gpt-realtime-2.1';
-const CONCURRENCY = Number(arg('concurrency') ?? 4);
+const CONCURRENCY = Number(arg('concurrency') ?? 2); // low by default: realtime rate limits are tight on new accounts
 /** Run every case N times: single runs of a sampled model are noisy. */
 const REPEAT = Math.max(1, Number(arg('repeat') ?? 1));
 const TIMEOUT_MS = 45_000;
@@ -116,13 +116,21 @@ function runCase(c: EvalCase): Promise<CaseResult> {
           send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: ev.call_id, output: JSON.stringify(output) } });
           break;
         }
-        case 'response.done':
+        case 'response.done': {
+          // A failed response (rate limit, quota) must count as an error, not as a wrong answer.
+          const resp = ev.response as { status?: string; status_details?: { error?: { code?: string; message?: string } } } | undefined;
+          if (resp?.status && resp.status !== 'completed') {
+            const e = resp.status_details?.error;
+            finish(`response ${resp.status}${e ? `: ${e.code ?? e.message}` : ''}`);
+            break;
+          }
           if (callsThisRound > 0 && rounds < MAX_ROUNDS) {
             rounds += 1;
             callsThisRound = 0;
             send({ type: 'response.create' });
           } else finish();
           break;
+        }
         case 'error':
           finish(JSON.stringify((ev as { error?: unknown }).error));
           break;
